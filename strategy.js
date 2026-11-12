@@ -243,7 +243,7 @@ function checkDualHtfConfluence(dailySMC, fourHourSMC) {
  * Institutional Market Maker Fibonacci Grid Plan
  * Generates exact limit orders, invalidation stop-loss, and multi-tier take-profit ladders.
  */
-function generateFibGridPlan(smcData, totalCapital = 25000, riskPerSetupPct = 0.05, minRangePct = 0.15) {
+function generateFibGridPlan(smcData, totalCapital = 25000, riskPerSetupPct = 0.20, minRangePct = 0.15) {
   if (!smcData) return null;
 
   // Filter out microscopic micro-whipsaws where range is too small to cover fees

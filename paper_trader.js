@@ -140,8 +140,8 @@ class PaperTrader {
     const smc1d = calculatePivot30SMC(this.candles1d, { len: 30 });
     // 4H Primary Swing Structure
     const smc4h = calculatePivot30SMC(this.candles4h, { len: 20 });
-    // LTF Execution Structure
-    const smcLtf = calculatePivot30SMC(this.candlesLtf, { len: this.executionTf === '1m' ? 25 : 30 });
+    // LTF Execution Structure (Fixed Pivot 7 for rapid 5M execution)
+    const smcLtf = calculatePivot30SMC(this.candlesLtf, { len: 7 });
 
     if (!smc1d || !smc4h || !smcLtf) return;
 
@@ -177,10 +177,10 @@ class PaperTrader {
 
     // 2. SCAN FOR NEW SETUP IF IDLE
     if (!this.activeGrid && smcLtf.goldenZone) {
-      // 4H PRIMARY FILTER: LTF 5M must align with 4H Trend!
+      // FIXED PIVOT 7 FOR INTRADAY 5M EXECUTION + 4H PRIMARY FILTER
       if (smcLtf.trend === primaryHtfBias) {
-        const minRangeReq = this.executionTf === '1m' ? 0.20 : this.executionTf === '5m' ? 0.20 : 0.30;
-        const plan = generateFibGridPlan(smcLtf, this.balance, 0.08, minRangeReq);
+        const minRangeReq = 0.20;
+        const plan = generateFibGridPlan(smcLtf, this.balance, 0.20, minRangeReq);
         this.lastGridPlan = plan;
 
         if (plan && !plan.tooSmallRange) {
