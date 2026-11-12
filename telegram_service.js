@@ -88,49 +88,66 @@ class TelegramService {
 
   async sendOrderFill(order, totalSize, weightedEntry, trend) {
     const isBull = trend === 'BULL';
+    const fillPrice = Number(order.fillPrice || order.price || 0);
+    const orderSize = Number(order.allocatedUsd || 0);
+    const weightPct = Math.round((order.weight || 0) * 100);
+    const entry = Number(weightedEntry || 0);
+    const total = Number(totalSize || 0);
+
     const msg = `${isBull ? '🟢' : '🔴'} *GRID ORDER FILLED!* [${trend}]\n\n` +
-      `📍 *Level:* ${order.label}\n` +
-      `💵 *Filled Price:* $${order.fillPrice.toFixed(2)}\n` +
-      `📦 *Order Size:* $${order.allocatedUsd.toFixed(2)} (${Math.round(order.weight * 100)}%)\n` +
-      `⚖️ *Weighted Entry:* $${weightedEntry.toFixed(2)}\n` +
-      `💼 *Total Active Position:* $${totalSize.toFixed(2)}`;
+      `📍 *Level:* ${order.label || 'Grid Order'}\n` +
+      `💵 *Filled Price:* $${fillPrice.toFixed(2)}\n` +
+      `📦 *Order Size:* $${orderSize.toFixed(2)} (${weightPct}%)\n` +
+      `⚖️ *Weighted Entry:* $${entry.toFixed(2)}\n` +
+      `💼 *Total Active Position:* $${total.toFixed(2)}`;
     await this.send(msg);
   }
 
   async sendBreakevenLock(entryPrice, levelPrice) {
+    const entry = Number(entryPrice || 0);
+    const level = Number(levelPrice || 0);
     const msg = `🛡️ *S/R FLIP RECLAIMED - BREAKEVEN LOCKED!* ✅\n\n` +
-      `માર્કેટે 1.0 End Point લેવલ ($${levelPrice.toFixed(2)}) ક્રોસ કરી લીધું છે.\n` +
-      `🔒 Stop Loss ને એન્ટ્રી પ્રાઈસ ($${entryPrice.toFixed(2)}) પર શિફ્ટ કરી દેવાયો છે.\n` +
+      `માર્કેટે 1.0 End Point લેવલ ($${level.toFixed(2)}) ક્રોસ કરી લીધું છે.\n` +
+      `🔒 Stop Loss ને એન્ટ્રી પ્રાઈસ ($${entry.toFixed(2)}) પર શિફ્ટ કરી દેવાયો છે.\n` +
       `*આ ટ્રેડ હવે ૧૦૦% રિસ્ક-ફ્રી છે!* 🎯`;
     await this.send(msg);
   }
 
   async sendTakeProfit(tp, pnlUsd, pnlPct) {
+    const tpPrice = Number((tp && tp.price) || 0);
+    const profit = Number(pnlUsd || 0);
+    const pct = Number(pnlPct || 0);
     const msg = `💰 *TAKE PROFIT HIT!* 🚀\n\n` +
-      `🎯 *Target:* ${tp.label} ($${tp.price.toFixed(2)})\n` +
-      `💵 *Realized Profit:* +$${pnlUsd.toFixed(2)} (+${pnlPct.toFixed(2)}%)\n` +
+      `🎯 *Target:* ${(tp && tp.label) || 'Fib Extension'} ($${tpPrice.toFixed(2)})\n` +
+      `💵 *Realized Profit:* +$${profit.toFixed(2)} (+${pct.toFixed(2)}%)\n` +
       `🎉 પ્રોફિટ એકાઉન્ટમાં ક્રેડિટ થઈ ગયો છે!`;
     await this.send(msg);
   }
 
   async sendStopLoss(slPrice, pnlUsd, pnlPct) {
+    const sl = Number(slPrice || 0);
+    const loss = Number(pnlUsd || 0);
+    const pct = Number(pnlPct || 0);
     const msg = `⚠️ *STRUCTURAL STOP LOSS TRIGGERED*\n\n` +
-      `🛑 *Exit Price:* $${slPrice.toFixed(2)} (0.0 Invalidation)\n` +
-      `📉 *Net PnL:* $${pnlUsd.toFixed(2)} (${pnlPct.toFixed(2)}%)\n` +
+      `🛑 *Exit Price:* $${sl.toFixed(2)} (0.0 Invalidation)\n` +
+      `📉 *Net PnL:* $${loss.toFixed(2)} (${pct.toFixed(2)}%)\n` +
       `મૂડીનું રક્ષણ કરવા માટે પોઝિશન ક્લોઝ કરવામાં આવી છે.`;
     await this.send(msg);
   }
 
   async sendStatus(status) {
+    const curPrice = Number(status.curPrice || 0);
+    const netPnlUsd = Number(status.netPnlUsd || 0);
+    const balance = Number(status.balance || 0);
     const msg = `📊 *POPAT 3 SMC BOT STATUS*\n\n` +
       `• Active Pair: *${status.symbol}*\n` +
       `• Status: *${status.isRunning ? 'RUNNING 🟢' : 'STOPPED 🛑'}*\n` +
       `• Execution TF: *${(status.executionTf || '5m').toUpperCase()}*\n` +
-      `• Live Price: *$${status.curPrice.toFixed(2)}*\n` +
+      `• Live Price: *$${curPrice.toFixed(2)}*\n` +
       `• 4H Primary Bias: *${status.htfStatus ? status.htfStatus.primary : 'N/A'}*\n` +
       `• 1D Macro Trend: *${status.htfStatus ? status.htfStatus.daily : 'N/A'}*\n` +
-      `• Virtual Balance: *$${status.balance.toLocaleString()}*\n` +
-      `• Net PnL: *${status.netPnlUsd >= 0 ? '+' : ''}$${status.netPnlUsd.toFixed(2)} (${status.netPnlPct}%)*\n` +
+      `• Virtual Balance: *$${balance.toLocaleString()}*\n` +
+      `• Net PnL: *${netPnlUsd >= 0 ? '+' : ''}$${netPnlUsd.toFixed(2)} (${status.netPnlPct || '0.00'}%)*\n` +
       `• Active Grid: *${status.activeGrid ? status.activeGrid.trend + ' (' + status.activeGrid.fills.length + ' fills)' : 'Scanning (Flat)'}*`;
     await this.send(msg);
   }

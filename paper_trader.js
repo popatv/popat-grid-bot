@@ -240,13 +240,14 @@ class PaperTrader {
           this.activeGrid.weightedEntryPrice = ((this.activeGrid.weightedEntryPrice * oldTotal) + (order.price * filledAmount)) / newTotal;
         }
         this.activeGrid.totalPositionSizeUsd = newTotal;
-        this.activeGrid.fills.push({ ...order, fillPrice: order.price, fillTime: curCandle.time });
+        const filledOrder = { ...order, fillPrice: order.price, fillTime: curCandle.time };
+        this.activeGrid.fills.push(filledOrder);
         this.activeGrid.pendingOrders.splice(i, 1);
         this.saveState();
 
         // Telegram Notification for Grid Fill
         telegramService.sendOrderFill(
-          order,
+          filledOrder,
           this.activeGrid.totalPositionSizeUsd,
           this.activeGrid.weightedEntryPrice,
           this.activeGrid.trend
