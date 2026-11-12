@@ -57,6 +57,12 @@ app.post('/api/set-tf', (req, res) => {
   res.json({ success: true, status: bot.getStatus() });
 });
 
+app.post('/api/set-symbol', (req, res) => {
+  const { symbol } = req.body;
+  bot.setSymbol(symbol);
+  res.json({ success: true, status: bot.getStatus() });
+});
+
 app.post('/api/backtest', async (req, res) => {
   try {
     const { symbol = 'BTCUSDT', interval = '5m', limit = 1000 } = req.body;

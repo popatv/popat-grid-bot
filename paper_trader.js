@@ -65,6 +65,17 @@ class PaperTrader {
     }
   }
 
+  setSymbol(newSymbol) {
+    const valid = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+    if (valid.includes(newSymbol)) {
+      this.symbol = newSymbol;
+      this.activeGrid = null;
+      this.lastCheckedBarTime = null;
+      console.log(`PaperTrader active symbol switched to: ${newSymbol}`);
+      this.tick();
+    }
+  }
+
   setExecutionTf(newTf) {
     if (['1m', '5m', '15m'].includes(newTf)) {
       this.executionTf = newTf;
@@ -100,8 +111,8 @@ class PaperTrader {
     try {
       const [rawLtf, raw4h, raw1d] = await Promise.all([
         fetchKlines(this.executionTf, 120),
-        fetchKlines('4h', 100),
-        fetchKlines('1d', 100)
+        fetchKlines('4h', 120),
+        fetchKlines('1d', 500)
       ]);
 
       const mapKlines = (data) => data.map(d => ({
@@ -123,21 +134,27 @@ class PaperTrader {
 
   async tick() {
     await this.fetchCandles();
-    if (this.candlesLtf.length < 30 || this.candles4h.length < 30 || this.candles1d.length < 25) return;
+    if (this.candlesLtf.length < 30 || this.candles4h.length < 30 || this.candles1d.length < 50) return;
 
-    const smc1d = calculatePivot30SMC(this.candles1d, { len: 14 });
+    // Daily Macro (full 30-bar pivot matching POPAT 3 SMC)
+    const smc1d = calculatePivot30SMC(this.candles1d, { len: 30 });
+    // 4H Primary Swing Structure
     const smc4h = calculatePivot30SMC(this.candles4h, { len: 20 });
+    // LTF Execution Structure
     const smcLtf = calculatePivot30SMC(this.candlesLtf, { len: this.executionTf === '1m' ? 25 : 30 });
 
     if (!smc1d || !smc4h || !smcLtf) return;
 
-    const htfConfluence = checkDualHtfConfluence(smc1d, smc4h);
+    const primaryHtfBias = smc4h.trend; // 4H is PRIMARY
+    const isDualAligned = smc1d.trend === smc4h.trend;
+
     this.htfStatus = {
+      primary: primaryHtfBias,
       daily: smc1d.trend,
       fourHour: smc4h.trend,
-      confluence: htfConfluence.bias,
-      permitted: htfConfluence.permitted,
-      reason: htfConfluence.reason
+      confluence: isDualAligned ? smc4h.trend : 'MIXED',
+      permitted: true,
+      reason: isDualAligned ? `Daily & 4H ${primaryHtfBias} Aligned` : `4H Primary ${primaryHtfBias} (1D Macro is ${smc1d.trend})`
     };
 
     this.ltfStatus = {
@@ -160,9 +177,9 @@ class PaperTrader {
 
     // 2. SCAN FOR NEW SETUP IF IDLE
     if (!this.activeGrid && smcLtf.goldenZone) {
-      // DUAL-HTF GUARDIAN CHECK (Daily + 4H)
-      if (htfConfluence.permitted && smcLtf.trend === htfConfluence.bias) {
-        const minRangeReq = this.executionTf === '1m' ? 0.20 : this.executionTf === '5m' ? 0.25 : 0.35;
+      // 4H PRIMARY FILTER: LTF 5M must align with 4H Trend!
+      if (smcLtf.trend === primaryHtfBias) {
+        const minRangeReq = this.executionTf === '1m' ? 0.20 : this.executionTf === '5m' ? 0.20 : 0.30;
         const plan = generateFibGridPlan(smcLtf, this.balance, 0.08, minRangeReq);
         this.lastGridPlan = plan;
 
@@ -175,6 +192,7 @@ class PaperTrader {
           if (inSetupRange) {
             this.activeGrid = {
               id: 'GRID_' + Date.now(),
+              symbol: this.symbol,
               trend: plan.trend,
               pendingOrders: [...plan.gridOrders],
               fills: [],
@@ -193,9 +211,9 @@ class PaperTrader {
       } else {
         this.lastGridPlan = {
           trend: smcLtf.trend,
-          htfBias: htfConfluence.bias,
+          htfBias: primaryHtfBias,
           blockedByHtf: true,
-          message: `Dual-HTF Guardian: ${htfConfluence.reason}`
+          message: `4H Primary Block: 5m is ${smcLtf.trend} but 4H is ${primaryHtfBias}.`
         };
       }
     }

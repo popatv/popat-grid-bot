@@ -75,11 +75,12 @@ async function runFibGridBacktest(symbol = 'BTCUSDT', ltfInterval = '15m', limit
     const subCandles1d = candles1d.filter(c => c.time <= curLtf.time);
     const subCandles4h = candles4h.filter(c => c.time <= curLtf.time);
 
-    const smc1d = subCandles1d.length >= 25 ? calculatePivot30SMC(subCandles1d, { len: 14 }) : null;
-    const smc4h = subCandles4h.length >= 35 ? calculatePivot30SMC(subCandles4h, { len: 20 }) : null;
+    // Full 30-bar pivot macro calculations matching POPAT 3 SMC
+    const smc1d = subCandles1d.length >= 60 ? calculatePivot30SMC(subCandles1d, { len: 30 }) : null;
+    const smc4h = subCandles4h.length >= 40 ? calculatePivot30SMC(subCandles4h, { len: 20 }) : null;
 
-    // Check Dual-HTF Confluence (Daily + 4H)
-    const htfConfluence = checkDualHtfConfluence(smc1d, smc4h);
+    // PRIMARY 4H STRUCTURE FILTER
+    const primaryHtfBias = smc4h ? smc4h.trend : (smc1d ? smc1d.trend : 'BULL');
 
     // 1. MANAGE ACTIVE GRID POSITION
     if (activeGrid) {
@@ -202,23 +203,16 @@ async function runFibGridBacktest(symbol = 'BTCUSDT', ltfInterval = '15m', limit
 
     // 2. SCAN FOR NEW SETUP IF IDLE
     if (!activeGrid) {
-      // DUAL-HTF GUARDIAN CHECK:
-      // Only proceed if 1D and 4H agree!
-      if (!htfConfluence.permitted) {
-        htfFilteredTrades++;
-        continue;
-      }
-
       const smcLtf = calculatePivot30SMC(subCandlesLtf, { len: ltfInterval === '1m' ? 25 : 30 });
       if (smcLtf && smcLtf.goldenZone) {
-        // LTF must align with Dual-HTF Confluence Bias
-        if (smcLtf.trend !== htfConfluence.bias) {
+        // PRIMARY 4H STRUCTURE FILTER: LTF 5M must align with 4H Trend!
+        if (smcLtf.trend !== primaryHtfBias) {
           htfFilteredTrades++;
           continue;
         }
 
         // Plan generation with minimum range threshold (0.15% to easily beat 0.08% fees)
-        const minRangeReq = ltfInterval === '1m' ? 0.20 : ltfInterval === '5m' ? 0.25 : 0.35;
+        const minRangeReq = ltfInterval === '1m' ? 0.20 : ltfInterval === '5m' ? 0.20 : 0.30;
         const plan = generateFibGridPlan(smcLtf, balance, 0.08, minRangeReq);
 
         if (plan && plan.tooSmallRange) {
@@ -302,8 +296,9 @@ async function runFibGridBacktest(symbol = 'BTCUSDT', ltfInterval = '15m', limit
 }
 
 if (require.main === module) {
-  const targetTf = process.argv[2] || '15m';
-  runFibGridBacktest('BTCUSDT', targetTf, 1000).catch(err => {
+  const targetTf = process.argv[2] || '5m';
+  const targetSymbol = process.argv[3] || 'BTCUSDT';
+  runFibGridBacktest(targetSymbol, targetTf, 1000).catch(err => {
     console.error('Backtest error:', err);
   });
 }

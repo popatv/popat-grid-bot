@@ -275,10 +275,17 @@
       </div>
 
       <div class="controls">
+        <!-- PAIR SELECTION (BTC, ETH, SOL) -->
+        <div class="tf-toggle" style="border-color: rgba(0, 229, 255, 0.35);">
+          <button class="tf-btn active" id="pairBTCUSDT" onclick="changePair('BTCUSDT')">🪙 BTC</button>
+          <button class="tf-btn" id="pairETHUSDT" onclick="changePair('ETHUSDT')">💎 ETH</button>
+          <button class="tf-btn" id="pairSOLUSDT" onclick="changePair('SOLUSDT')">⚡ SOL</button>
+        </div>
+
         <!-- TIME FRAME SELECTION (DEFAULT 5M) -->
         <div class="tf-toggle">
           <button class="tf-btn" id="tf1m" onclick="changeTf('1m')">1M</button>
-          <button class="tf-btn active" id="tf5m" onclick="changeTf('5m')">5M (Standard)</button>
+          <button class="tf-btn active" id="tf5m" onclick="changeTf('5m')">5M</button>
           <button class="tf-btn" id="tf15m" onclick="changeTf('15m')">15M</button>
         </div>
 
@@ -485,9 +492,16 @@
       document.getElementById('valBalance').textContent = '$' + data.balance.toLocaleString(undefined, { minimumFractionDigits: 2 });
       document.getElementById('valPrice').textContent = '$' + data.curPrice.toLocaleString(undefined, { minimumFractionDigits: 2 });
 
+      if (data.symbol) {
+        ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].forEach(sym => {
+          const btn = document.getElementById('pair' + sym);
+          if (btn) btn.className = 'tf-btn' + (sym === data.symbol ? ' active' : '');
+        });
+      }
+
       if (data.executionTf) {
         activeExecutionTf = data.executionTf;
-        document.getElementById('valTfLabel').textContent = data.executionTf;
+        document.getElementById('valTfLabel').textContent = `${data.symbol} ${data.executionTf}`;
         ['1m', '5m', '15m'].forEach(tf => {
           const btn = document.getElementById('tf' + tf);
           if (btn) btn.className = 'tf-btn' + (tf === activeExecutionTf ? ' active' : '');
@@ -498,12 +512,11 @@
       netEl.textContent = (data.netPnlUsd >= 0 ? '+$' : '-$') + Math.abs(data.netPnlUsd).toFixed(2) + ` (${data.netPnlPct}%)`;
       netEl.style.color = data.netPnlUsd > 0 ? 'var(--green)' : data.netPnlUsd < 0 ? 'var(--red)' : 'var(--text-muted)';
 
-      // Dual-HTF Confluence Indicator
+      // 4H Primary + 1D Macro Confluence
       const htfEl = document.getElementById('valHtfConfluence');
       if (data.htfStatus) {
-        const isPermitted = data.htfStatus.permitted;
-        htfEl.textContent = `${data.htfStatus.daily} 1D + ${data.htfStatus.fourHour} 4H`;
-        htfEl.style.color = isPermitted ? 'var(--green)' : 'var(--yellow)';
+        htfEl.textContent = `4H ${data.htfStatus.primary} (1D ${data.htfStatus.daily})`;
+        htfEl.style.color = data.htfStatus.primary === 'BULL' ? 'var(--green)' : 'var(--red)';
       }
 
       // LTF Bias
@@ -611,6 +624,15 @@
       } catch (e) {
         console.error(e);
       }
+    }
+
+    async function changePair(symbol) {
+      await fetch('/api/set-symbol', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol })
+      });
+      updateStatus();
     }
 
     async function changeTf(tf) {

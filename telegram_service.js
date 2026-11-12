@@ -123,17 +123,19 @@ class TelegramService {
 
   async sendStatus(status) {
     const msg = `📊 *POPAT 3 SMC BOT STATUS*\n\n` +
+      `• Active Pair: *${status.symbol}*\n` +
       `• Status: *${status.isRunning ? 'RUNNING 🟢' : 'STOPPED 🛑'}*\n` +
       `• Execution TF: *${(status.executionTf || '5m').toUpperCase()}*\n` +
-      `• Live BTC Price: *$${status.curPrice.toFixed(2)}*\n` +
+      `• Live Price: *$${status.curPrice.toFixed(2)}*\n` +
+      `• 4H Primary Bias: *${status.htfStatus ? status.htfStatus.primary : 'N/A'}*\n` +
+      `• 1D Macro Trend: *${status.htfStatus ? status.htfStatus.daily : 'N/A'}*\n` +
       `• Virtual Balance: *$${status.balance.toLocaleString()}*\n` +
       `• Net PnL: *${status.netPnlUsd >= 0 ? '+' : ''}$${status.netPnlUsd.toFixed(2)} (${status.netPnlPct}%)*\n` +
-      `• HTF Confluence: *${status.htfStatus ? status.htfStatus.daily + ' 1D + ' + status.htfStatus.fourHour + ' 4H' : 'N/A'}*\n` +
       `• Active Grid: *${status.activeGrid ? status.activeGrid.trend + ' (' + status.activeGrid.fills.length + ' fills)' : 'Scanning (Flat)'}*`;
     await this.send(msg);
   }
 
-  // --- TELEGRAM POLLING FOR LIVE COMMANDS (/start, /status, /stop, /startbot) ---
+  // --- TELEGRAM POLLING FOR LIVE COMMANDS (/start, /status, /stop, /startbot, /btc, /eth, /sol) ---
   startPolling() {
     if (this.isPolling) return;
     this.isPolling = true;
@@ -170,6 +172,15 @@ class TelegramService {
               } else if (text === '/balance' && this.botInstance) {
                 const s = this.botInstance.getStatus();
                 await this.send(`💰 *Account Balance:* $${s.balance.toLocaleString()} | *PnL:* ${s.netPnlUsd >= 0 ? '+' : ''}$${s.netPnlUsd.toFixed(2)}`);
+              } else if (text === '/btc' && this.botInstance) {
+                this.botInstance.setSymbol('BTCUSDT');
+                await this.send(`🪙 *Switched active monitoring to BTC/USDT!*`);
+              } else if (text === '/eth' && this.botInstance) {
+                this.botInstance.setSymbol('ETHUSDT');
+                await this.send(`🪙 *Switched active monitoring to ETH/USDT!*`);
+              } else if (text === '/sol' && this.botInstance) {
+                this.botInstance.setSymbol('SOLUSDT');
+                await this.send(`🪙 *Switched active monitoring to SOL/USDT!*`);
               }
             }
           }
