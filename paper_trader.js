@@ -75,11 +75,33 @@ class PaperTrader {
   }
 
   async fetchCandles() {
+    // Robust endpoints with fallback: data-api.binance.vision (Geo-unrestricted for US/Cloud/Render)
+    const baseUrls = [
+      'https://data-api.binance.vision/api/v3/klines',
+      'https://api.binance.com/api/v3/klines',
+      'https://api1.binance.com/api/v3/klines'
+    ];
+
+    const fetchKlines = async (interval, limit) => {
+      let lastErr = null;
+      for (const base of baseUrls) {
+        try {
+          const res = await axios.get(`${base}?symbol=${this.symbol}&interval=${interval}&limit=${limit}`, { timeout: 8000 });
+          if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+            return res.data;
+          }
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      throw lastErr || new Error('All Binance kline endpoints failed');
+    };
+
     try {
-      const [resLtf, res4h, res1d] = await Promise.all([
-        axios.get(`https://api.binance.com/api/v3/klines?symbol=${this.symbol}&interval=${this.executionTf}&limit=120`, { timeout: 8000 }),
-        axios.get(`https://api.binance.com/api/v3/klines?symbol=${this.symbol}&interval=4h&limit=100`, { timeout: 8000 }),
-        axios.get(`https://api.binance.com/api/v3/klines?symbol=${this.symbol}&interval=1d&limit=100`, { timeout: 8000 })
+      const [rawLtf, raw4h, raw1d] = await Promise.all([
+        fetchKlines(this.executionTf, 120),
+        fetchKlines('4h', 100),
+        fetchKlines('1d', 100)
       ]);
 
       const mapKlines = (data) => data.map(d => ({
@@ -91,9 +113,9 @@ class PaperTrader {
         volume: parseFloat(d[5])
       }));
 
-      this.candlesLtf = mapKlines(resLtf.data);
-      this.candles4h = mapKlines(res4h.data);
-      this.candles1d = mapKlines(res1d.data);
+      this.candlesLtf = mapKlines(rawLtf);
+      this.candles4h = mapKlines(raw4h);
+      this.candles1d = mapKlines(raw1d);
     } catch (e) {
       console.error('PaperTrader fetch error:', e.message);
     }

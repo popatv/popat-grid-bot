@@ -10,21 +10,33 @@ const axios = require('axios');
 const { calculatePivot30SMC, checkDualHtfConfluence, generateFibGridPlan } = require('./strategy');
 
 async function fetchCandles(symbol = 'BTCUSDT', interval = '15m', limit = 1000) {
-  try {
-    const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-    const res = await axios.get(url, { timeout: 12000 });
-    return res.data.map(d => ({
-      time: Math.floor(d[0] / 1000),
-      open: parseFloat(d[1]),
-      high: parseFloat(d[2]),
-      low: parseFloat(d[3]),
-      close: parseFloat(d[4]),
-      volume: parseFloat(d[5])
-    }));
-  } catch (err) {
-    console.error(`Failed to fetch ${interval} candles:`, err.message);
-    throw err;
+  const baseUrls = [
+    'https://data-api.binance.vision/api/v3/klines',
+    'https://api.binance.com/api/v3/klines',
+    'https://api1.binance.com/api/v3/klines'
+  ];
+
+  let lastErr = null;
+  for (const base of baseUrls) {
+    try {
+      const url = `${base}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+      const res = await axios.get(url, { timeout: 12000 });
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        return res.data.map(d => ({
+          time: Math.floor(d[0] / 1000),
+          open: parseFloat(d[1]),
+          high: parseFloat(d[2]),
+          low: parseFloat(d[3]),
+          close: parseFloat(d[4]),
+          volume: parseFloat(d[5])
+        }));
+      }
+    } catch (err) {
+      lastErr = err;
+    }
   }
+  console.error(`Failed to fetch ${interval} candles:`, lastErr.message);
+  throw lastErr;
 }
 
 async function runFibGridBacktest(symbol = 'BTCUSDT', ltfInterval = '15m', limit = 1000) {
