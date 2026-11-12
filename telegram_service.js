@@ -1,6 +1,6 @@
 /**
- * POPAT 3 SMC TELEGRAM NOTIFICATION & COMMAND SERVICE
- * Real-time Mobile Alerts for Order Fills, TP/SL, and Dual-HTF Confluence
+ * POPAT 1 TP REVERSAL TELEGRAM NOTIFICATION & COMMAND SERVICE
+ * Real-time Mobile Alerts for Sniper Reversal Entries, 1:2 RR TP Hits, and Stop Loss
  */
 
 const axios = require('axios');
@@ -70,85 +70,106 @@ class TelegramService {
     }
   }
 
-  // --- PRE-FORMATTED INSTITUTIONAL EVENT ALERTS ---
+  // --- PRE-FORMATTED ALERTS ---
 
   async sendWelcome(name = 'Trader') {
-    const msg = `🦜 *POPAT 3 SMC DUAL-HTF GRID BOT ACTIVATED!* 🚀\n\n` +
+    const msg = `🦜 *POPAT 1 TP REVERSAL + SMA 30 BOT ACTIVATED!* 🚀\n\n` +
       `નમસ્તે ${name}!\n` +
-      `તમારો @popatgridbot સફળતાપૂર્વક કનેક્ટ થઈ ગયો છે.\n\n` +
-      `⚙️ *Current Engine Setup:*\n` +
-      `• Execution Timeframe: *5-Minute (5M)*\n` +
-      `• Dual-HTF Filter: *Daily (1D) + 4-Hour (4H) Confluence*\n` +
-      `• Grid Bids: *0.50 EQ, 0.618 Golden Pocket, 0.75 OTE, 0.786 Deep*\n` +
-      `• S/R Flip: *1.0 Level (Auto-Breakeven lock)*\n` +
-      `• TP Ladders: *1.272, 1.445, 1.618 Golden Extensions*\n\n` +
-      `📱 *હવે જ્યારે પણ નવો ટ્રેડ પડશે કે પ્રોફિટ બુક થશે ત્યારે સીધો મેસેજ અહીં મળશે!*`;
+      `તમારો @popatgridbot નવી 15M TP Reversal Strategy સાથે કનેક્ટ થઈ ગયો છે.\n\n` +
+      `⚙️ *નવી Strategy Details (13,000 Candles Tested):*\n` +
+      `• Timeframe: *15-Minute (15M)*\n` +
+      `• Entry Trigger: *7th Bar Moti Exhaustion TP + 1.2x ATR Distance*\n` +
+      `• Trend Filter: *SMA 30 Slope (Eliminates 90%+ false trades)*\n` +
+      `  - *SHORT*: TP Above Candle + SMA 30 Sloping DOWN\n` +
+      `  - *LONG*: TP Below Candle + SMA 30 Sloping UP\n` +
+      `• Stop Loss: *1.7 ATR Beyond Candle Wick*\n` +
+      `• Take Profit: *Fixed 1:2 Risk-to-Reward (R:R)*\n` +
+      `• Position Size: *$5,000 Virtual Allocation*\n\n` +
+      `📱 *હવે જ્યારે પણ નવો ટ્રેડ પડશે, 1:2 TP હિટ થશે કે SL વાગશે ત્યારે તુરંત મેસેજ અહીં મળશે!*`;
     await this.send(msg);
   }
 
-  async sendOrderFill(order, totalSize, weightedEntry, trend) {
-    const isBull = trend === 'BULL';
-    const fillPrice = Number(order.fillPrice || order.price || 0);
-    const orderSize = Number(order.allocatedUsd || 0);
-    const weightPct = Math.round((order.weight || 0) * 100);
-    const entry = Number(weightedEntry || 0);
-    const total = Number(totalSize || 0);
+  async sendPositionEntry(pos) {
+    const isLong = pos.type === 'LONG';
+    const entry = Number(pos.entryPrice || 0);
+    const sl = Number(pos.stopLoss || 0);
+    const tp = Number(pos.takeProfit || 0);
+    const riskUsd = Number(pos.riskUsd || 0);
+    const potentialProfit = riskUsd * 2;
 
-    const msg = `${isBull ? '🟢' : '🔴'} *GRID ORDER FILLED!* [${trend}]\n\n` +
-      `📍 *Level:* ${order.label || 'Grid Order'}\n` +
-      `💵 *Filled Price:* $${fillPrice.toFixed(2)}\n` +
-      `📦 *Order Size:* $${orderSize.toFixed(2)} (${weightPct}%)\n` +
-      `⚖️ *Weighted Entry:* $${entry.toFixed(2)}\n` +
-      `💼 *Total Active Position:* $${total.toFixed(2)}`;
+    const msg = `${isLong ? '🟢' : '🔴'} *🎯 POPAT 1 TP REVERSAL ENTRY!* [${pos.type}]\n\n` +
+      `🪙 *Pair:* ${pos.symbol} (15M)\n` +
+      `💵 *Entry Price:* $${entry.toFixed(2)}\n` +
+      `🛑 *Stop Loss (1.7 ATR):* $${sl.toFixed(2)}\n` +
+      `🎯 *Take Profit (1:2 RR):* $${tp.toFixed(2)}\n` +
+      `📈 *SMA 30 Slope:* Sloping *${pos.sma30Slope}* ✅ (Filter Passed)\n` +
+      `📦 *Position Size:* $${Number(pos.sizeUsd || 5000).toLocaleString()}\n` +
+      `⚖️ *Risk : Reward:* 1 : 2 (Risk: -$${riskUsd.toFixed(2)} | Target: +$${potentialProfit.toFixed(2)})\n\n` +
+      `*Sniper Reversal Trade Active!* 🏹`;
     await this.send(msg);
   }
 
-  async sendBreakevenLock(entryPrice, levelPrice) {
-    const entry = Number(entryPrice || 0);
-    const level = Number(levelPrice || 0);
-    const msg = `🛡️ *S/R FLIP RECLAIMED - BREAKEVEN LOCKED!* ✅\n\n` +
-      `માર્કેટે 1.0 End Point લેવલ ($${level.toFixed(2)}) ક્રોસ કરી લીધું છે.\n` +
-      `🔒 Stop Loss ને એન્ટ્રી પ્રાઈસ ($${entry.toFixed(2)}) પર શિફ્ટ કરી દેવાયો છે.\n` +
-      `*આ ટ્રેડ હવે ૧૦૦% રિસ્ક-ફ્રી છે!* 🎯`;
+  async sendTakeProfit(trade) {
+    const isLong = trade.type === 'LONG';
+    const entry = Number(trade.entryPrice || 0);
+    const exit = Number(trade.exitPrice || 0);
+    const profit = Number(trade.pnlUsd || 0);
+    const pct = Number(trade.pnlPct || 0);
+    const bal = Number(trade.newBalance || 0);
+
+    const msg = `💰 *🎯 TAKE PROFIT HIT (1:2 RR)!* 🚀\n\n` +
+      `${isLong ? '🟢' : '🔴'} *Trade:* ${trade.type} on ${trade.symbol}\n` +
+      `💵 *Entry Price:* $${entry.toFixed(2)}\n` +
+      `🏁 *Exit Price:* $${exit.toFixed(2)}\n` +
+      `🎉 *Realized Profit:* *+$${profit.toFixed(2)}* (+${pct.toFixed(2)}%)\n` +
+      `🏦 *New Account Balance:* *$${bal.toLocaleString()}*\n\n` +
+      `*1:2 Target Successfully Achieved!* 🥂`;
     await this.send(msg);
   }
 
-  async sendTakeProfit(tp, pnlUsd, pnlPct) {
-    const tpPrice = Number((tp && tp.price) || 0);
-    const profit = Number(pnlUsd || 0);
-    const pct = Number(pnlPct || 0);
-    const msg = `💰 *TAKE PROFIT HIT!* 🚀\n\n` +
-      `🎯 *Target:* ${(tp && tp.label) || 'Fib Extension'} ($${tpPrice.toFixed(2)})\n` +
-      `💵 *Realized Profit:* +$${profit.toFixed(2)} (+${pct.toFixed(2)}%)\n` +
-      `🎉 પ્રોફિટ એકાઉન્ટમાં ક્રેડિટ થઈ ગયો છે!`;
-    await this.send(msg);
-  }
+  async sendStopLoss(trade) {
+    const isLong = trade.type === 'LONG';
+    const entry = Number(trade.entryPrice || 0);
+    const exit = Number(trade.exitPrice || 0);
+    const loss = Number(trade.pnlUsd || 0);
+    const pct = Number(trade.pnlPct || 0);
+    const bal = Number(trade.newBalance || 0);
 
-  async sendStopLoss(slPrice, pnlUsd, pnlPct) {
-    const sl = Number(slPrice || 0);
-    const loss = Number(pnlUsd || 0);
-    const pct = Number(pnlPct || 0);
-    const msg = `⚠️ *STRUCTURAL STOP LOSS TRIGGERED*\n\n` +
-      `🛑 *Exit Price:* $${sl.toFixed(2)} (0.0 Invalidation)\n` +
-      `📉 *Net PnL:* $${loss.toFixed(2)} (${pct.toFixed(2)}%)\n` +
-      `મૂડીનું રક્ષણ કરવા માટે પોઝિશન ક્લોઝ કરવામાં આવી છે.`;
+    const msg = `🛑 *STOP LOSS TRIGGERED*\n\n` +
+      `${isLong ? '🟢' : '🔴'} *Trade:* ${trade.type} on ${trade.symbol}\n` +
+      `💵 *Entry Price:* $${entry.toFixed(2)}\n` +
+      `🏁 *Exit Price:* $${exit.toFixed(2)} (1.7 ATR)\n` +
+      `📉 *Net PnL:* *-$${Math.abs(loss).toFixed(2)}* (${pct.toFixed(2)}%)\n` +
+      `🏦 *New Account Balance:* *$${bal.toLocaleString()}*\n\n` +
+      `મૂડી સુરક્ષિત રાખવા માટે પોઝિશન નિયમ મુજબ ક્લોઝ કરવામાં આવી છે.`;
     await this.send(msg);
   }
 
   async sendStatus(status) {
     const curPrice = Number(status.curPrice || 0);
-    const netPnlUsd = Number(status.netPnlUsd || 0);
     const balance = Number(status.balance || 0);
-    const msg = `📊 *POPAT 3 SMC BOT STATUS*\n\n` +
+    const netPnlUsd = Number(status.netPnlUsd || 0);
+    const pos = status.activePosition;
+
+    let posText = '🔎 *Scanning 15M Candles (Flat)*';
+    if (pos) {
+      const isLong = pos.type === 'LONG';
+      const uPnl = Number(pos.unrealizedPnlUsd || 0);
+      posText = `${isLong ? '🟢 LONG' : '🔴 SHORT'} @ $${Number(pos.entryPrice).toFixed(2)}\n` +
+        `  • SL: $${Number(pos.stopLoss).toFixed(2)} | TP (1:2): $${Number(pos.takeProfit).toFixed(2)}\n` +
+        `  • Unrealized PnL: *${uPnl >= 0 ? '+' : ''}$${uPnl.toFixed(2)}*`;
+    }
+
+    const msg = `📊 *POPAT 1 TP REVERSAL (15M) STATUS*\n\n` +
       `• Active Pair: *${status.symbol}*\n` +
       `• Status: *${status.isRunning ? 'RUNNING 🟢' : 'STOPPED 🛑'}*\n` +
-      `• Execution TF: *${(status.executionTf || '5m').toUpperCase()}*\n` +
+      `• Timeframe: *15M*\n` +
       `• Live Price: *$${curPrice.toFixed(2)}*\n` +
-      `• 4H Primary Bias: *${status.htfStatus ? status.htfStatus.primary : 'N/A'}*\n` +
-      `• 1D Macro Trend: *${status.htfStatus ? status.htfStatus.daily : 'N/A'}*\n` +
+      `• SMA 30: *$${Number(status.sma30 || 0).toFixed(2)}* (Slope: *${status.sma30Slope || 'FLAT'}*)\n` +
       `• Virtual Balance: *$${balance.toLocaleString()}*\n` +
-      `• Net PnL: *${netPnlUsd >= 0 ? '+' : ''}$${netPnlUsd.toFixed(2)} (${status.netPnlPct || '0.00'}%)*\n` +
-      `• Active Grid: *${status.activeGrid ? status.activeGrid.trend + ' (' + status.activeGrid.fills.length + ' fills)' : 'Scanning (Flat)'}*`;
+      `• Net Realized PnL: *${netPnlUsd >= 0 ? '+' : ''}$${netPnlUsd.toFixed(2)}*\n` +
+      `• Total Trades: *${status.totalTrades || 0}* (Win Rate: *${status.winRate || '0.0'}%*)\n\n` +
+      `📌 *Active Position:*\n${posText}`;
     await this.send(msg);
   }
 
@@ -169,13 +190,11 @@ class TelegramService {
               const text = (u.message.text || '').trim();
               const firstName = (u.message.from && u.message.from.first_name) || 'Trader';
 
-              // If chat ID not registered yet or updated
               if (this.chatId !== incomingChatId) {
                 this.setChatId(incomingChatId);
                 console.log(`Telegram Chat ID registered: ${incomingChatId} (${firstName})`);
               }
 
-              // Handle Commands
               if (text === '/start' || text.toLowerCase() === 'hi' || text.toLowerCase() === 'hello') {
                 await this.sendWelcome(firstName);
               } else if (text === '/status' && this.botInstance) {
@@ -191,13 +210,13 @@ class TelegramService {
                 await this.send(`💰 *Account Balance:* $${s.balance.toLocaleString()} | *PnL:* ${s.netPnlUsd >= 0 ? '+' : ''}$${s.netPnlUsd.toFixed(2)}`);
               } else if (text === '/btc' && this.botInstance) {
                 this.botInstance.setSymbol('BTCUSDT');
-                await this.send(`🪙 *Switched active monitoring to BTC/USDT!*`);
+                await this.send(`🪙 *Switched active monitoring to BTC/USDT (15M)!*`);
               } else if (text === '/eth' && this.botInstance) {
                 this.botInstance.setSymbol('ETHUSDT');
-                await this.send(`🪙 *Switched active monitoring to ETH/USDT!*`);
+                await this.send(`🪙 *Switched active monitoring to ETH/USDT (15M)!*`);
               } else if (text === '/sol' && this.botInstance) {
                 this.botInstance.setSymbol('SOLUSDT');
-                await this.send(`🪙 *Switched active monitoring to SOL/USDT!*`);
+                await this.send(`🪙 *Switched active monitoring to SOL/USDT (15M)!*`);
               }
             }
           }

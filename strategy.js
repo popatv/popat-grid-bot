@@ -1,315 +1,198 @@
 /**
- * POPAT 3 SMC FIBONACCI MARKET MAKER ENGINE
- * Exact Mathematical Parity with POPAT 3 SMC.pine & smcEngine.js
+ * POPAT 1 TP REVERSAL + SMA 30 SLOPE FILTER ENGINE
+ * Exact Mathematical Parity with POPAT_1_TP_REVERSAL_BTC15M.pine & full_4_5_months_backtest.js
  * 
- * Core Features:
- * 1. Pivot 30 Macro Swing High & Low Detection (ta.pivothigh / ta.pivotlow len=30)
- * 2. Dynamic BOS / CHoCH Break of Structure Engine
- * 3. Exact Pine Script Fibonacci Anchoring:
- *    - BULL: fibStartPrice = btmy (0.0 Floor), fibEndPrice = topy (1.0 Ceiling)
- *    - BEAR: fibStartPrice = topy (0.0 Ceiling), fibEndPrice = btmy (1.0 Floor)
- * 4. Institutional Grid Levels:
- *    - 0.000: Structural Invalidation Floor/Ceiling (Hard Stop Loss)
- *    - 0.382: Shallow Retrace
- *    - 0.500: Equilibrium (Fair Value Grid Order 1 - 20% size)
- *    - 0.618: Golden Ratio Pocket (Grid Order 2 - 35% size)
- *    - 0.750: Institutional OTE Reload (Grid Order 3 - 25% size)
- *    - 0.786: Deep Liquidity Sweep (Grid Order 4 - 20% size)
- *    - 1.000: End Point / S-R Flip (Breakeven + Trail SL trigger)
- *    - 1.272: TP1 Expansion (Close 35%)
- *    - 1.445: TP2 Mid Expansion (Close 35%)
- *    - 1.618: TP3 Golden Expansion (Close 30%)
- * 5. Multi-Timeframe Dual HTF Guardian:
- *    - HTF 1 (Daily 1D): Institutional Macro Super-Trend
- *    - HTF 2 (4H): Swing Momentum & Structure Filter
- *    - LTF (1m, 5m, 15m): Rapid Precision Execution Grid
+ * Strategy Rules:
+ * 1. Timeframe: 15-Minute (15M)
+ * 2. Moti Candle: Body >= 1.1 * ATR(14) OR Body >= 1.5 * BodySMA(14)
+ * 3. TP Exhaustion Label: 7 bars after Moti candle (Rolloff trigger)
+ * 4. Distance Filter: Price extended >= 1.2 * ATR away from SMA 30
+ *    - Bullish Moti -> TP Above candle (Bull exhaustion)
+ *    - Bearish Moti -> TP Below candle (Bear exhaustion)
+ * 5. SMA 30 Slope Trend Filter (Eliminates 90%+ false trades):
+ *    - SHORT ENTRY: TP Above candle AND SMA 30 sloping DOWN (sma30[i] < sma30[i-1])
+ *    - LONG ENTRY:  TP Below candle AND SMA 30 sloping UP   (sma30[i] > sma30[i-1])
+ * 6. Risk & Execution:
+ *    - Single sniper entry at candle close
+ *    - Stop Loss: 1.7 * ATR beyond candle High (Short) or Low (Long)
+ *    - Take Profit: Fixed 1:2 Risk-to-Reward (R:R)
  */
 
-function calculatePivot30SMC(candles, options = {}) {
-  const defaultLen = options.len || 30;
-  if (!candles || candles.length < 15) {
-    return null;
+function computeSMA(candles, length) {
+  const sma = new Array(candles.length).fill(null);
+  let sum = 0;
+  for (let i = 0; i < candles.length; i++) {
+    sum += candles[i].close;
+    if (i >= length) sum -= candles[i - length].close;
+    if (i >= length - 1) sma[i] = sum / length;
+  }
+  return sma;
+}
+
+function computeATR(candles, period = 14) {
+  const tr = new Array(candles.length).fill(0);
+  for (let i = 1; i < candles.length; i++) {
+    const h = candles[i].high;
+    const l = candles[i].low;
+    const prevC = candles[i - 1].close;
+    tr[i] = Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC));
+  }
+  const atr = new Array(candles.length).fill(null);
+  let sum = 0;
+  for (let i = 1; i <= period; i++) sum += tr[i];
+  atr[period] = sum / period;
+  for (let i = period + 1; i < candles.length; i++) {
+    atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
+  }
+  return atr;
+}
+
+function computeBodySMA(candles, period = 14) {
+  const bodySma = new Array(candles.length).fill(null);
+  let bodySum = 0;
+  for (let i = 0; i < candles.length; i++) {
+    const b = Math.abs(candles[i].close - candles[i].open);
+    bodySum += b;
+    if (i >= period) bodySum -= Math.abs(candles[i - period].close - candles[i - period].open);
+    if (i >= period - 1) bodySma[i] = bodySum / period;
+  }
+  return bodySma;
+}
+
+/**
+ * Run historical analysis on 15M candles and return current indicators + latest signal
+ */
+function analyzeTpReversal(candles, options = {}) {
+  const useSma30Filter = options.useSma30Filter !== false; // Default true
+  const slAtrMult = options.slAtrMult || 1.7;
+  const rrRatio = options.rrRatio || 2.0;
+  const tpMotiThresh = options.tpMotiThresh || 1.1;
+  const tpSma30DistMult = options.tpSma30DistMult || 1.2;
+  const sma7Len = 7;
+
+  if (!candles || candles.length < 35) {
+    return {
+      signal: null,
+      status: 'INSUFFICIENT_DATA',
+      sma30: null,
+      sma30Slope: 'FLAT',
+      atr: null
+    };
   }
 
-  const n = candles.length;
-  // Adaptive pivot length for low candle counts
-  const len = n < defaultLen * 2
-    ? Math.max(3, Math.min(defaultLen, Math.floor(n / 4)))
-    : defaultLen;
+  const sma30 = computeSMA(candles, 30);
+  const atr = computeATR(candles, 14);
+  const bodySma = computeBodySMA(candles, 14);
 
-  let os = candles[Math.min(10, n - 1)].close >= candles[0].close ? 1 : 0; // 1 = BULL, 0 = BEAR
-  let topy = null;
-  let topx = null;
-  let btmy = null;
-  let btmx = null;
-  let top_crossed = false;
-  let btm_crossed = false;
+  let moti7BarIdx = null;
+  let moti7IsBull = true;
+  let moti7BodyVal = 0.0;
 
-  let fibStartPrice = null;
-  let fibEndPrice = null;
-  let fibStartIndex = null;
-  let lastFibDirection = 1; // 1 = BULL, 0 = BEAR
+  const signals = [];
 
-  const swings = [];
-  const structures = [];
-
-  // Bar-by-bar execution mirroring Pine Script
-  for (let i = 0; i < n; i++) {
+  for (let i = 35; i < candles.length; i++) {
     const c = candles[i];
-    const p = i - len;
+    const curAtr = atr[i];
+    const curSma30 = sma30[i];
 
-    if (p >= len && p + len <= i) {
-      // Pivot High (Macro 30)
-      let isPh = true;
-      const phVal = candles[p].high;
-      for (let j = p - len; j <= p + len; j++) {
-        if (candles[j].high > phVal) {
-          isPh = false;
-          break;
-        }
-      }
-      if (isPh) {
-        topy = phVal;
-        topx = p;
-        top_crossed = false;
-        swings.push({ index: p, time: candles[p].time, price: topy, type: 'HIGH' });
-      }
+    if (!curAtr || !curSma30) continue;
 
-      // Pivot Low (Macro 30)
-      let isPl = true;
-      const plVal = candles[p].low;
-      for (let j = p - len; j <= p + len; j++) {
-        if (candles[j].low < plVal) {
-          isPl = false;
-          break;
-        }
-      }
-      if (isPl) {
-        btmy = plVal;
-        btmx = p;
-        btm_crossed = false;
-        swings.push({ index: p, time: candles[p].time, price: btmy, type: 'LOW' });
+    const curBarBody = Math.abs(c.close - c.open);
+    const curIsMoti = (curBarBody >= curAtr * tpMotiThresh) || (bodySma[i] && curBarBody >= bodySma[i] * 1.5);
+
+    if (moti7BarIdx !== null && (i - moti7BarIdx > sma7Len)) {
+      moti7BarIdx = null;
+      moti7BodyVal = 0.0;
+    }
+
+    if (curIsMoti) {
+      if (moti7BarIdx === null || (i - moti7BarIdx >= sma7Len) || (curBarBody >= moti7BodyVal * 0.85)) {
+        moti7BarIdx = i;
+        moti7IsBull = c.close >= c.open;
+        moti7BodyVal = curBarBody;
       }
     }
 
-    // Structure Breaks (BOS / CHoCH)
-    const bullMajorBreak = topy !== null && c.close > topy && !top_crossed;
-    const bearMajorBreak = btmy !== null && c.close < btmy && !btm_crossed;
+    const tpRolloffTrigger = (moti7BarIdx !== null) && (i - moti7BarIdx === sma7Len);
+    const isFarFromSma30 = moti7IsBull
+      ? ((c.close - curSma30) >= (curAtr * tpSma30DistMult))
+      : ((curSma30 - c.close) >= (curAtr * tpSma30DistMult));
 
-    if (bullMajorBreak) {
-      const isChoch = os === 0;
-      os = 1;
-      top_crossed = true;
-      structures.push({
-        index: i,
+    let tpAbove = false;
+    let tpBelow = false;
+
+    if (tpRolloffTrigger && isFarFromSma30) {
+      if (moti7IsBull) tpAbove = true;
+      else tpBelow = true;
+    }
+
+    const prevSma30 = sma30[i - 1];
+    const sma30SlopeDn = curSma30 < prevSma30;
+    const sma30SlopeUp = curSma30 > prevSma30;
+
+    const allowShort = tpAbove && (!useSma30Filter || sma30SlopeDn);
+    const allowLong  = tpBelow && (!useSma30Filter || sma30SlopeUp);
+
+    if (allowShort) {
+      const entry = c.close;
+      const sl = c.high + (curAtr * slAtrMult);
+      const risk = sl - entry;
+      const tp = entry - (risk * rrRatio);
+      signals.push({
+        barIndex: i,
         time: c.time,
-        price: topy,
-        type: isChoch ? 'CHoCH' : 'BOS',
-        direction: 'BULL'
+        type: 'SHORT',
+        entry,
+        sl,
+        tp,
+        risk,
+        atr: curAtr,
+        sma30: curSma30,
+        sma30Slope: 'DOWN'
       });
-
-      // Update Fibonacci anchors upon Bullish break
-      fibStartPrice = btmy !== null ? btmy : c.low;
-      fibEndPrice = topy !== null ? topy : c.high;
-      fibStartIndex = btmx !== null ? btmx : i;
-      lastFibDirection = 1;
-    }
-
-    if (bearMajorBreak) {
-      const isChoch = os === 1;
-      os = 0;
-      btm_crossed = true;
-      structures.push({
-        index: i,
+    } else if (allowLong) {
+      const entry = c.close;
+      const sl = c.low - (curAtr * slAtrMult);
+      const risk = entry - sl;
+      const tp = entry + (risk * rrRatio);
+      signals.push({
+        barIndex: i,
         time: c.time,
-        price: btmy,
-        type: isChoch ? 'CHoCH' : 'BOS',
-        direction: 'BEAR'
-      });
-
-      // Update Fibonacci anchors upon Bearish break
-      fibStartPrice = topy !== null ? topy : c.high;
-      fibEndPrice = btmy !== null ? btmy : c.low;
-      fibStartIndex = topx !== null ? topx : i;
-      lastFibDirection = 0;
-    }
-  }
-
-  // Active Fibonacci synchronization
-  if (topy !== null && btmy !== null) {
-    if (os === 1) {
-      fibStartPrice = btmy;
-      fibEndPrice = topy;
-      fibStartIndex = btmx || 0;
-      lastFibDirection = 1;
-    } else {
-      fibStartPrice = topy;
-      fibEndPrice = btmy;
-      fibStartIndex = topx || 0;
-      lastFibDirection = 0;
-    }
-  }
-
-  // Fallback if pivots not yet locked
-  if (fibStartPrice === null || fibEndPrice === null) {
-    let macroHigh = -Infinity;
-    let macroLow = Infinity;
-    for (let k = 0; k < n; k++) {
-      if (candles[k].high > macroHigh) macroHigh = candles[k].high;
-      if (candles[k].low < macroLow) macroLow = candles[k].low;
-    }
-    const isBullAdv = candles[n - 1].close >= (macroHigh + macroLow) / 2;
-    fibStartPrice = isBullAdv ? macroLow : macroHigh;
-    fibEndPrice = isBullAdv ? macroHigh : macroLow;
-    lastFibDirection = isBullAdv ? 1 : 0;
-  }
-
-  // Compute all Exact POPAT 3 SMC Fibonacci Levels
-  const rng = fibEndPrice - fibStartPrice;
-  const fibRatios = [
-    { ratio: 0.000, label: '0.0 (Start / Floor)', isStopLoss: true },
-    { ratio: 0.236, label: '0.236 (Shallow)', isInfo: true },
-    { ratio: 0.382, label: '0.382 (Mild Retrace)', isInfo: true },
-    { ratio: 0.500, label: '0.500 (EQ Fair Value)', isGridOrder: true, weight: 0.20 },
-    { ratio: 0.618, label: '0.618 (Golden Pocket)', isGridOrder: true, weight: 0.35 },
-    { ratio: 0.750, label: '0.750 (Institutional OTE)', isGridOrder: true, weight: 0.25 },
-    { ratio: 0.786, label: '0.786 (Deep Liquidity Sweep)', isGridOrder: true, weight: 0.20 },
-    { ratio: 1.000, label: '1.0 (End / S-R Flip)', isBreakevenTrigger: true },
-    { ratio: 1.272, label: '1.272 (TP1 Expansion)', isTakeProfit: true, exitPct: 0.35 },
-    { ratio: 1.445, label: '1.445 (TP2 Mid Expansion)', isTakeProfit: true, exitPct: 0.35 },
-    { ratio: 1.618, label: '1.618 (TP3 Golden Target)', isTakeProfit: true, exitPct: 0.30 },
-    { ratio: 2.000, label: '2.000 (TP4 Macro Target)', isTakeProfit: false }
-  ];
-
-  const levels = {};
-  const levelsList = [];
-  for (const f of fibRatios) {
-    const price = Math.round((fibStartPrice + rng * f.ratio) * 100) / 100;
-    const item = { ...f, price };
-    levels[f.ratio.toString()] = item;
-    levels[f.ratio.toFixed(1)] = item;
-    levels[f.ratio.toFixed(3)] = item;
-    levelsList.push(item);
-  }
-
-  const currentPrice = candles[n - 1].close;
-  const rangeAbs = Math.abs(rng);
-
-  return {
-    trend: os === 1 ? 'BULL' : 'BEAR',
-    os,
-    fibStartPrice,
-    fibEndPrice,
-    fibStartIndex,
-    range: rangeAbs,
-    levels,
-    levelsList,
-    swingHigh: topy,
-    swingLow: btmy,
-    goldenZone: {
-      top: Math.max(levels['0.618'].price, levels['0.786'].price),
-      bottom: Math.min(levels['0.618'].price, levels['0.786'].price)
-    },
-    currentPrice,
-    lastStructure: structures.length > 0 ? structures[structures.length - 1] : null
-  };
-}
-
-/**
- * Institutional Dual HTF Confluence Guardian (Daily 1D + 4H)
- * Strict Rule: Only permits trades when both Daily and 4H agree on the Macro Structure.
- */
-function checkDualHtfConfluence(dailySMC, fourHourSMC) {
-  if (!dailySMC || !fourHourSMC) {
-    return { permitted: false, bias: 'NEUTRAL', reason: 'HTF data warming up' };
-  }
-
-  if (dailySMC.trend === 'BULL' && fourHourSMC.trend === 'BULL') {
-    return { permitted: true, bias: 'BULL', reason: 'Daily + 4H Bullish Confluence Locked' };
-  }
-
-  if (dailySMC.trend === 'BEAR' && fourHourSMC.trend === 'BEAR') {
-    return { permitted: true, bias: 'BEAR', reason: 'Daily + 4H Bearish Confluence Locked' };
-  }
-
-  return {
-    permitted: false,
-    bias: 'CONFLICT',
-    reason: `HTF Divergence: Daily is ${dailySMC.trend} but 4H is ${fourHourSMC.trend}. Blocked!`
-  };
-}
-
-/**
- * Institutional Market Maker Fibonacci Grid Plan
- * Generates exact limit orders, invalidation stop-loss, and multi-tier take-profit ladders.
- */
-function generateFibGridPlan(smcData, totalCapital = 25000, riskPerSetupPct = 0.20, minRangePct = 0.15) {
-  if (!smcData) return null;
-
-  // Filter out microscopic micro-whipsaws where range is too small to cover fees
-  const rangePct = (smcData.range / smcData.currentPrice) * 100;
-  if (rangePct < minRangePct) {
-    return { tooSmallRange: true, rangePct, minRangePct };
-  }
-
-  const isBull = smcData.trend === 'BULL';
-  const allocatableCapital = totalCapital * riskPerSetupPct;
-
-  const gridOrders = [];
-  const takeProfits = [];
-  const stopLoss = {
-    price: smcData.levels['0.0'].price,
-    label: isBull ? '0.0 Structural Floor Stop' : '0.0 Structural Ceiling Stop',
-    ratio: 0.0
-  };
-
-  // 4 Institutional Limit Orders inside Discount / Premium Zone
-  const orderLevels = ['0.5', '0.618', '0.75', '0.786'];
-  for (const key of orderLevels) {
-    const lvl = smcData.levels[key];
-    if (lvl) {
-      gridOrders.push({
-        ratio: lvl.ratio,
-        price: lvl.price,
-        label: lvl.label,
-        weight: lvl.weight,
-        allocatedUsd: Math.round(allocatableCapital * lvl.weight * 100) / 100,
-        type: isBull ? 'LIMIT_BUY' : 'LIMIT_SELL'
+        type: 'LONG',
+        entry,
+        sl,
+        tp,
+        risk,
+        atr: curAtr,
+        sma30: curSma30,
+        sma30Slope: 'UP'
       });
     }
   }
 
-  // 3 Take Profit Extension Targets
-  const tpLevels = ['1.272', '1.445', '1.618'];
-  for (const key of tpLevels) {
-    const lvl = smcData.levels[key];
-    if (lvl) {
-      takeProfits.push({
-        ratio: lvl.ratio,
-        price: lvl.price,
-        label: lvl.label,
-        exitPct: lvl.exitPct,
-        type: isBull ? 'LIMIT_SELL' : 'LIMIT_BUY'
-      });
-    }
-  }
+  const lastIdx = candles.length - 1;
+  const curSma30 = sma30[lastIdx];
+  const prevSma30 = sma30[lastIdx - 1];
+  const curAtr = atr[lastIdx];
+  const slope = curSma30 > prevSma30 ? 'UP' : curSma30 < prevSma30 ? 'DOWN' : 'FLAT';
+
+  // Check if the most recent closed candle has a signal
+  const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
+  const isSignalOnLatestBar = latestSignal && (latestSignal.barIndex === lastIdx || latestSignal.barIndex === lastIdx - 1);
 
   return {
-    trend: smcData.trend,
-    currentPrice: smcData.currentPrice,
-    structureFloor: smcData.fibStartPrice,
-    structureCeiling: smcData.fibEndPrice,
-    srFlipLevel: smcData.levels['1.0'].price,
-    stopLoss,
-    gridOrders,
-    takeProfits,
-    goldenZone: smcData.goldenZone,
-    rangePct: parseFloat(rangePct.toFixed(2))
+    latestSignal: isSignalOnLatestBar ? latestSignal : null,
+    allSignals: signals,
+    sma30: curSma30,
+    sma30Slope: slope,
+    atr: curAtr,
+    lastCandle: candles[lastIdx]
   };
 }
 
 module.exports = {
-  calculatePivot30SMC,
-  checkDualHtfConfluence,
-  generateFibGridPlan
+  analyzeTpReversal,
+  computeSMA,
+  computeATR,
+  computeBodySMA
 };
