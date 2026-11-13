@@ -54,6 +54,11 @@ class TelegramService {
     this.botInstance = bot;
   }
 
+  setBotInstances(bot1, bot2) {
+    this.botInstance = bot1;
+    this.smcInstance = bot2;
+  }
+
   async send(text) {
     if (!this.chatId) {
       console.log('Telegram message skipped (Chat ID not set yet).');
@@ -95,7 +100,8 @@ class TelegramService {
     const sl = Number(pos.stopLoss || 0);
     const tp = Number(pos.takeProfit || 0);
     const riskUsd = Number(pos.riskUsd || 0);
-    const potentialProfit = riskUsd * 2;
+    const rr = pos.rrRatio || 1.0;
+    const potentialProfit = riskUsd * rr;
     const isGold = pos.symbol === 'PAXGUSDT';
     const pairLabel = isGold ? 'PAXGUSDT (Gold)' : pos.symbol;
 
@@ -104,10 +110,10 @@ class TelegramService {
       `🧭 *Direction:* *${pos.type}*\n` +
       `💵 *Entry Price:* $${entry.toFixed(2)}\n` +
       `🛑 *Stop Loss (1.7 ATR):* $${sl.toFixed(2)}\n` +
-      `🎯 *Take Profit (1:2 RR):* $${tp.toFixed(2)}\n` +
+      `🎯 *Take Profit (${rr === 1 ? '1:1' : '1:2'} RR):* $${tp.toFixed(2)}\n` +
       `📈 *SMA 30 Slope:* Sloping *${pos.sma30Slope}* ✅ (Filter Passed)\n` +
       `📦 *Position Size:* $${Number(pos.sizeUsd || 5000).toLocaleString()}\n` +
-      `⚖️ *Risk : Reward:* 1 : 2 (Risk: -$${riskUsd.toFixed(2)} | Target: +$${potentialProfit.toFixed(2)})\n\n` +
+      `⚖️ *Risk : Reward:* 1 : ${rr} (Risk: -$${riskUsd.toFixed(2)} | Target: +$${potentialProfit.toFixed(2)})\n\n` +
       `*Sniper Reversal Trade Active on ${pairLabel}!* 🏹`;
     await this.send(msg);
   }
@@ -172,13 +178,37 @@ class TelegramService {
       pairsText += `• *${label}:* $${Number(d.curPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} | SMA 30: ${d.sma30Slope || 'FLAT'} ${slopeIcon}\n  └ Status: ${pStatus}\n`;
     });
 
-    const msg = `📊 *POPAT 1 MULTI-ASSET (15M) STATUS*\n\n` +
+    let msg = `📊 *POPAT DUAL-STRATEGY BOT STATUS*\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🎯 *STRATEGY 1: TP REVERSAL (15M)*\n` +
       `• Status: *${status.isRunning ? 'RUNNING 🟢' : 'STOPPED 🛑'}*\n` +
-      `• Timeframe: *15M Live Binance Feed*\n` +
-      `• Virtual Balance: *$${balance.toLocaleString()}*\n` +
-      `• Net Realized PnL: *${netPnlUsd >= 0 ? '+' : ''}$${netPnlUsd.toFixed(2)}*\n` +
-      `• Closed Trades: *${status.totalTrades || 0}* (Win Rate: *${status.winRate || '0.0'}%*)\n\n` +
-      `🪙 *Monitored Assets:*\n${pairsText}`;
+      `• Balance: *$${balance.toLocaleString()}* (PnL: *${netPnlUsd >= 0 ? '+' : ''}$${netPnlUsd.toFixed(2)}*)\n` +
+      `• Closed Trades: *${status.totalTrades || 0}* (Win Rate: *${status.winRate || '0.0'}%*)\n` +
+      `• Assets:\n${pairsText}`;
+
+    if (this.smcInstance) {
+      const smcStat = this.smcInstance.getStatus();
+      const smcNet = Number(smcStat.netPnlUsd || 0);
+      let smcPairs = '';
+      ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PAXGUSDT'].forEach(s => {
+        const d = smcStat.smcData ? smcStat.smcData[s] : null;
+        const pos = smcStat.positionsMap ? smcStat.positionsMap[s] : null;
+        const trend = d ? d.trend : 'NEUTRAL';
+        let pStatus = '⚪ FLAT';
+        if (pos) {
+          pStatus = `${pos.type === 'LONG' ? '🟢 LONG' : '🔴 SHORT'} @ $${Number(pos.entryPrice).toFixed(2)}`;
+        }
+        smcPairs += `• *${s === 'PAXGUSDT' ? '🥇 Gold' : s}:* Trend: *${trend}* | ${pStatus}\n`;
+      });
+
+      msg += `\n━━━━━━━━━━━━━━━━━━━━\n` +
+        `🏛️ *STRATEGY 2: POPAT 3 SMC ENGINE*\n` +
+        `• Status: *${smcStat.isRunning ? 'RUNNING 🟢' : 'STOPPED 🛑'}*\n` +
+        `• Balance: *$${Number(smcStat.balance || 25000).toLocaleString()}* (PnL: *${smcNet >= 0 ? '+' : ''}$${smcNet.toFixed(2)}*)\n` +
+        `• Closed Trades: *${smcStat.totalTrades || 0}* (Win Rate: *${smcStat.winRate || '0.0'}%*)\n` +
+        `• SMC Structure:\n${smcPairs}`;
+    }
+
     await this.send(msg);
   }
 
