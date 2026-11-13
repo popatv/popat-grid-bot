@@ -1,6 +1,6 @@
 /**
  * POPAT 1 TP REVERSAL TELEGRAM NOTIFICATION & COMMAND SERVICE
- * Real-time Mobile Alerts for Sniper Reversal Entries, 1:2 RR TP Hits, and Stop Loss
+ * Real-time Mobile Alerts for Sniper Reversal Entries, 1:2 RR TP Hits, and Stop Loss across BTC, ETH, SOL, GOLD
  */
 
 const axios = require('axios');
@@ -15,7 +15,7 @@ class TelegramService {
     this.chatId = null;
     this.pollingOffset = 0;
     this.isPolling = false;
-    this.botInstance = null; // reference to PaperTrader
+    this.botInstance = null;
 
     this.loadConfig();
   }
@@ -73,19 +73,19 @@ class TelegramService {
   // --- PRE-FORMATTED ALERTS ---
 
   async sendWelcome(name = 'Trader') {
-    const msg = `🦜 *POPAT 1 TP REVERSAL + SMA 30 BOT ACTIVATED!* 🚀\n\n` +
+    const msg = `🦜 *POPAT 1 TP REVERSAL (BTC + ETH + SOL + GOLD) ACTIVATED!* 🚀\n\n` +
       `નમસ્તે ${name}!\n` +
-      `તમારો @popatgridbot નવી 15M TP Reversal Strategy સાથે કનેક્ટ થઈ ગયો છે.\n\n` +
-      `⚙️ *નવી Strategy Details (13,000 Candles Tested):*\n` +
-      `• Timeframe: *15-Minute (15M)*\n` +
+      `તમારો @popatgridbot હવે *BTC, ETH, SOL અને GOLD (PAXG)* ચારેય એસેટ્સ પર એકસાથે લાઈવ સ્કેનિંગ અને ટ્રેડિંગ માટે તૈયાર છે!\n\n` +
+      `⚙️ *નવી Strategy Details:*\n` +
+      `• Pairs: *BTC, ETH, SOL, PAXG/Gold (15M)*\n` +
       `• Entry Trigger: *7th Bar Moti Exhaustion TP + 1.2x ATR Distance*\n` +
-      `• Trend Filter: *SMA 30 Slope (Eliminates 90%+ false trades)*\n` +
+      `• Trend Filter: *SMA 30 Slope*\n` +
       `  - *SHORT*: TP Above Candle + SMA 30 Sloping DOWN\n` +
       `  - *LONG*: TP Below Candle + SMA 30 Sloping UP\n` +
       `• Stop Loss: *1.7 ATR Beyond Candle Wick*\n` +
       `• Take Profit: *Fixed 1:2 Risk-to-Reward (R:R)*\n` +
-      `• Position Size: *$5,000 Virtual Allocation*\n\n` +
-      `📱 *હવે જ્યારે પણ નવો ટ્રેડ પડશે, 1:2 TP હિટ થશે કે SL વાગશે ત્યારે તુરંત મેસેજ અહીં મળશે!*`;
+      `• Allocation: *$5,000 per trade* (Total: $25,000)\n\n` +
+      `📱 *કોઈપણ પેર પર સિગ્નલ બનશે એટલે તુરંત એન્ટ્રી, 1:2 TP અને SL નો મેસેજ અહીં પહોંચી જશે!*`;
     await this.send(msg);
   }
 
@@ -96,16 +96,19 @@ class TelegramService {
     const tp = Number(pos.takeProfit || 0);
     const riskUsd = Number(pos.riskUsd || 0);
     const potentialProfit = riskUsd * 2;
+    const isGold = pos.symbol === 'PAXGUSDT';
+    const pairLabel = isGold ? 'PAXGUSDT (Gold)' : pos.symbol;
 
-    const msg = `${isLong ? '🟢' : '🔴'} *🎯 POPAT 1 TP REVERSAL ENTRY!* [${pos.type}]\n\n` +
-      `🪙 *Pair:* ${pos.symbol} (15M)\n` +
+    const msg = `${isLong ? '🟢' : '🔴'} *🎯 POPAT 1 TP REVERSAL ENTRY!* [${isGold ? '🥇 ' : ''}${pairLabel}]\n\n` +
+      `🪙 *Asset:* *${pairLabel}* (15M)\n` +
+      `🧭 *Direction:* *${pos.type}*\n` +
       `💵 *Entry Price:* $${entry.toFixed(2)}\n` +
       `🛑 *Stop Loss (1.7 ATR):* $${sl.toFixed(2)}\n` +
       `🎯 *Take Profit (1:2 RR):* $${tp.toFixed(2)}\n` +
       `📈 *SMA 30 Slope:* Sloping *${pos.sma30Slope}* ✅ (Filter Passed)\n` +
       `📦 *Position Size:* $${Number(pos.sizeUsd || 5000).toLocaleString()}\n` +
       `⚖️ *Risk : Reward:* 1 : 2 (Risk: -$${riskUsd.toFixed(2)} | Target: +$${potentialProfit.toFixed(2)})\n\n` +
-      `*Sniper Reversal Trade Active!* 🏹`;
+      `*Sniper Reversal Trade Active on ${pairLabel}!* 🏹`;
     await this.send(msg);
   }
 
@@ -116,14 +119,16 @@ class TelegramService {
     const profit = Number(trade.pnlUsd || 0);
     const pct = Number(trade.pnlPct || 0);
     const bal = Number(trade.newBalance || 0);
+    const isGold = trade.symbol === 'PAXGUSDT';
+    const pairLabel = isGold ? 'PAXGUSDT (Gold)' : trade.symbol;
 
     const msg = `💰 *🎯 TAKE PROFIT HIT (1:2 RR)!* 🚀\n\n` +
-      `${isLong ? '🟢' : '🔴'} *Trade:* ${trade.type} on ${trade.symbol}\n` +
+      `${isLong ? '🟢' : '🔴'} *Asset:* *${pairLabel}* (${trade.type})\n` +
       `💵 *Entry Price:* $${entry.toFixed(2)}\n` +
       `🏁 *Exit Price:* $${exit.toFixed(2)}\n` +
       `🎉 *Realized Profit:* *+$${profit.toFixed(2)}* (+${pct.toFixed(2)}%)\n` +
       `🏦 *New Account Balance:* *$${bal.toLocaleString()}*\n\n` +
-      `*1:2 Target Successfully Achieved!* 🥂`;
+      `*1:2 Target Successfully Achieved on ${pairLabel}!* 🥂`;
     await this.send(msg);
   }
 
@@ -134,9 +139,11 @@ class TelegramService {
     const loss = Number(trade.pnlUsd || 0);
     const pct = Number(trade.pnlPct || 0);
     const bal = Number(trade.newBalance || 0);
+    const isGold = trade.symbol === 'PAXGUSDT';
+    const pairLabel = isGold ? 'PAXGUSDT (Gold)' : trade.symbol;
 
     const msg = `🛑 *STOP LOSS TRIGGERED*\n\n` +
-      `${isLong ? '🟢' : '🔴'} *Trade:* ${trade.type} on ${trade.symbol}\n` +
+      `${isLong ? '🟢' : '🔴'} *Asset:* *${pairLabel}* (${trade.type})\n` +
       `💵 *Entry Price:* $${entry.toFixed(2)}\n` +
       `🏁 *Exit Price:* $${exit.toFixed(2)} (1.7 ATR)\n` +
       `📉 *Net PnL:* *-$${Math.abs(loss).toFixed(2)}* (${pct.toFixed(2)}%)\n` +
@@ -146,34 +153,36 @@ class TelegramService {
   }
 
   async sendStatus(status) {
-    const curPrice = Number(status.curPrice || 0);
     const balance = Number(status.balance || 0);
     const netPnlUsd = Number(status.netPnlUsd || 0);
-    const pos = status.activePosition;
+    const mData = status.marketData || {};
 
-    let posText = '🔎 *Scanning 15M Candles (Flat)*';
-    if (pos) {
-      const isLong = pos.type === 'LONG';
-      const uPnl = Number(pos.unrealizedPnlUsd || 0);
-      posText = `${isLong ? '🟢 LONG' : '🔴 SHORT'} @ $${Number(pos.entryPrice).toFixed(2)}\n` +
-        `  • SL: $${Number(pos.stopLoss).toFixed(2)} | TP (1:2): $${Number(pos.takeProfit).toFixed(2)}\n` +
-        `  • Unrealized PnL: *${uPnl >= 0 ? '+' : ''}$${uPnl.toFixed(2)}*`;
-    }
+    let pairsText = '';
+    ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PAXGUSDT'].forEach(s => {
+      const d = mData[s] || {};
+      const pos = status.positionsMap ? status.positionsMap[s] : null;
+      const slopeIcon = d.sma30Slope === 'DOWN' ? '🔻' : d.sma30Slope === 'UP' ? '🔺' : '➖';
+      const label = s === 'PAXGUSDT' ? '🥇 Gold (PAXG)' : s;
+      
+      let pStatus = '⚪ FLAT (Scanning)';
+      if (pos) {
+        pStatus = `${pos.type === 'LONG' ? '🟢 LONG' : '🔴 SHORT'} @ $${Number(pos.entryPrice).toFixed(2)} (TP: $${Number(pos.takeProfit).toFixed(2)})`;
+      }
 
-    const msg = `📊 *POPAT 1 TP REVERSAL (15M) STATUS*\n\n` +
-      `• Active Pair: *${status.symbol}*\n` +
+      pairsText += `• *${label}:* $${Number(d.curPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} | SMA 30: ${d.sma30Slope || 'FLAT'} ${slopeIcon}\n  └ Status: ${pStatus}\n`;
+    });
+
+    const msg = `📊 *POPAT 1 MULTI-ASSET (15M) STATUS*\n\n` +
       `• Status: *${status.isRunning ? 'RUNNING 🟢' : 'STOPPED 🛑'}*\n` +
-      `• Timeframe: *15M*\n` +
-      `• Live Price: *$${curPrice.toFixed(2)}*\n` +
-      `• SMA 30: *$${Number(status.sma30 || 0).toFixed(2)}* (Slope: *${status.sma30Slope || 'FLAT'}*)\n` +
+      `• Timeframe: *15M Live Binance Feed*\n` +
       `• Virtual Balance: *$${balance.toLocaleString()}*\n` +
       `• Net Realized PnL: *${netPnlUsd >= 0 ? '+' : ''}$${netPnlUsd.toFixed(2)}*\n` +
-      `• Total Trades: *${status.totalTrades || 0}* (Win Rate: *${status.winRate || '0.0'}%*)\n\n` +
-      `📌 *Active Position:*\n${posText}`;
+      `• Closed Trades: *${status.totalTrades || 0}* (Win Rate: *${status.winRate || '0.0'}%*)\n\n` +
+      `🪙 *Monitored Assets:*\n${pairsText}`;
     await this.send(msg);
   }
 
-  // --- TELEGRAM POLLING FOR LIVE COMMANDS (/start, /status, /stop, /startbot, /btc, /eth, /sol) ---
+  // --- TELEGRAM POLLING FOR LIVE COMMANDS ---
   startPolling() {
     if (this.isPolling) return;
     this.isPolling = true;
@@ -208,22 +217,11 @@ class TelegramService {
               } else if (text === '/balance' && this.botInstance) {
                 const s = this.botInstance.getStatus();
                 await this.send(`💰 *Account Balance:* $${s.balance.toLocaleString()} | *PnL:* ${s.netPnlUsd >= 0 ? '+' : ''}$${s.netPnlUsd.toFixed(2)}`);
-              } else if (text === '/btc' && this.botInstance) {
-                this.botInstance.setSymbol('BTCUSDT');
-                await this.send(`🪙 *Switched active monitoring to BTC/USDT (15M)!*`);
-              } else if (text === '/eth' && this.botInstance) {
-                this.botInstance.setSymbol('ETHUSDT');
-                await this.send(`🪙 *Switched active monitoring to ETH/USDT (15M)!*`);
-              } else if (text === '/sol' && this.botInstance) {
-                this.botInstance.setSymbol('SOLUSDT');
-                await this.send(`🪙 *Switched active monitoring to SOL/USDT (15M)!*`);
               }
             }
           }
         }
-      } catch (err) {
-        // Suppress temporary network/timeout blips
-      }
+      } catch (err) { }
       setTimeout(poll, 2500);
     };
 

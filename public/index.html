@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🦜 POPAT 1 | TP Reversal 15M + SMA 30 Filter Bot</title>
+  <title>🦜 POPAT 1 | Multi-Asset TP Reversal (BTC + ETH + SOL + GOLD)</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Syne:wght@700;800;900&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -14,7 +14,8 @@
       --green-glow: rgba(0, 230, 118, 0.35);
       --red: #FF1744;
       --red-glow: rgba(255, 23, 68, 0.35);
-      --yellow: #FFD600;
+      --gold: #FFD700;
+      --gold-glow: rgba(255, 215, 0, 0.35);
       --accent: #2979FF;
       --purple: #B388FF;
       --cyan: #00E5FF;
@@ -37,7 +38,7 @@
                         radial-gradient(circle at 90% 90%, rgba(0, 230, 118, 0.06) 0%, transparent 45%);
     }
 
-    .container { max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .container { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 
     header {
       display: flex;
@@ -108,58 +109,54 @@
     .btn-action:hover { transform: translateY(-2px); opacity: 0.95; }
     .btn-action:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
-    .pair-selector {
-      display: flex;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 4px;
-      border-radius: 10px;
+    /* 4 MULTI-ASSET CARDS (BTC, ETH, SOL, GOLD) */
+    .grid-pairs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .pair-card {
+      background: var(--card-bg);
       border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.3s ease;
     }
-    .tf-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 6px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
+    .pair-card.active-trade {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(41, 121, 255, 0.25);
     }
-    .tf-btn.active { background: var(--accent); color: #fff; box-shadow: 0 0 10px rgba(41, 121, 255, 0.4); }
+    .pair-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pair-title { font-size: 1rem; font-weight: 800; font-family: var(--font-mono); }
+    .pair-price { font-size: 1.35rem; font-weight: 800; font-family: var(--font-mono); }
+    .pair-slope { font-size: 0.72rem; font-weight: 700; }
 
+    /* SUMMARY METRICS */
     .grid-metrics {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 16px;
     }
     .card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 14px;
-      padding: 18px;
-      backdrop-filter: blur(16px);
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
-    .card-title {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .card-value {
-      font-family: var(--font-mono);
-      font-size: 1.5rem;
-      font-weight: 800;
-    }
-    .card-sub {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
+    .card-title { font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; }
+    .card-value { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 800; }
+    .card-sub { font-size: 0.75rem; color: var(--text-muted); }
 
     .main-grid {
       display: grid;
@@ -170,7 +167,6 @@
       .main-grid { grid-template-columns: 1fr; }
     }
 
-    /* ACTIVE POSITION CARD */
     .pos-card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -180,76 +176,11 @@
       flex-direction: column;
       gap: 16px;
     }
-    .pos-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .pos-type-badge {
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      font-weight: 800;
-      padding: 6px 14px;
-      border-radius: 8px;
-    }
-    .pos-type-badge.LONG { background: rgba(0, 230, 118, 0.15); color: var(--green); border: 1px solid var(--green); }
-    .pos-type-badge.SHORT { background: rgba(255, 23, 68, 0.15); color: var(--red); border: 1px solid var(--red); }
-    .pos-type-badge.FLAT { background: rgba(255, 255, 255, 0.06); color: var(--text-muted); border: 1px solid var(--card-border); }
 
-    .pos-levels {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 14px;
-      border-radius: 10px;
-      border: 1px solid var(--card-border);
-    }
-    .level-box { display: flex; flex-direction: column; gap: 4px; }
-    .level-label { font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); }
-    .level-val { font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); }
-
-    .scanning-box {
-      text-align: center;
-      padding: 36px 20px;
-      color: var(--text-muted);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-    }
-    .radar-circle {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      border: 2px dashed var(--accent);
-      animation: spin 6s linear infinite;
-    }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-
-    /* TABLE */
-    .table-wrap {
-      overflow-x: auto;
-      max-height: 380px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.8rem;
-    }
-    th {
-      text-align: left;
-      padding: 10px 12px;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      border-bottom: 1px solid var(--card-border);
-    }
-    td {
-      padding: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      font-family: var(--font-mono);
-    }
+    .table-wrap { overflow-x: auto; max-height: 380px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th { text-align: left; padding: 10px 12px; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.7rem; border-bottom: 1px solid var(--card-border); }
+    td { padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-family: var(--font-mono); }
   </style>
 </head>
 <body>
@@ -258,8 +189,8 @@
       <div class="title-box">
         <span style="font-size: 1.8rem;">🦜</span>
         <div>
-          <h1>POPAT 1 TP REVERSAL (15M)</h1>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">Moti 7-Bar Rolloff Exhaustion + SMA 30 Slope Filter + 1:2 Fixed RR</div>
+          <h1>POPAT 1 MULTI-ASSET TP REVERSAL (15M)</h1>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Simultaneous Live Trading on BTC, ETH, SOL & GOLD | SMA 30 Slope Filter + 1:2 RR</div>
         </div>
         <div id="botBadge" class="badge">
           <div class="dot"></div>
@@ -268,84 +199,130 @@
       </div>
 
       <div class="controls">
-        <div class="pair-selector">
-          <button id="pairBTCUSDT" class="tf-btn active" onclick="switchPair('BTCUSDT')">BTC</button>
-          <button id="pairETHUSDT" class="tf-btn" onclick="switchPair('ETHUSDT')">ETH</button>
-          <button id="pairSOLUSDT" class="tf-btn" onclick="switchPair('SOLUSDT')">SOL</button>
-        </div>
-
-        <button id="btnStart" class="btn-action btn-start" onclick="startBot()" disabled>▶ Start</button>
-        <button id="btnStop" class="btn-action btn-stop" onclick="stopBot()">⏸ Pause</button>
+        <button id="btnStart" class="btn-action btn-start" onclick="startBot()" disabled>▶ Start All</button>
+        <button id="btnStop" class="btn-action btn-stop" onclick="stopBot()">⏸ Pause All</button>
         <button class="btn-action btn-reset" onclick="resetBot()">🔄 Reset</button>
         <a href="https://t.me/popatgridbot" target="_blank" class="btn-action btn-tg">📱 Telegram Bot</a>
       </div>
     </header>
 
-    <!-- METRICS CARDS -->
-    <div class="grid-metrics">
-      <div class="card">
-        <div class="card-title">Live Price</div>
-        <div id="valPrice" class="card-value">$0.00</div>
-        <div id="valPair" class="card-sub">BTCUSDT (15M Binance Feed)</div>
+    <!-- 4 LIVE MULTI-ASSET CARDS (BTC, ETH, SOL, GOLD) -->
+    <div class="grid-pairs">
+      <!-- BTC CARD -->
+      <div id="cardBTCUSDT" class="pair-card">
+        <div class="pair-header">
+          <span class="pair-title">🪙 BTC/USDT</span>
+          <span id="badgeBTCUSDT" style="font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); font-family: var(--font-mono);">SCANNING</span>
+        </div>
+        <div id="priceBTCUSDT" class="pair-price">$0.00</div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.72rem;">
+          <span style="color: var(--text-muted);">SMA 30: <strong id="smaBTCUSDT" style="color: #fff;">$0.00</strong></span>
+          <span id="slopeBTCUSDT" class="pair-slope">Slope: SCANNING</span>
+        </div>
       </div>
 
+      <!-- ETH CARD -->
+      <div id="cardETHUSDT" class="pair-card">
+        <div class="pair-header">
+          <span class="pair-title">🔷 ETH/USDT</span>
+          <span id="badgeETHUSDT" style="font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); font-family: var(--font-mono);">SCANNING</span>
+        </div>
+        <div id="priceETHUSDT" class="pair-price">$0.00</div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.72rem;">
+          <span style="color: var(--text-muted);">SMA 30: <strong id="smaETHUSDT" style="color: #fff;">$0.00</strong></span>
+          <span id="slopeETHUSDT" class="pair-slope">Slope: SCANNING</span>
+        </div>
+      </div>
+
+      <!-- SOL CARD -->
+      <div id="cardSOLUSDT" class="pair-card">
+        <div class="pair-header">
+          <span class="pair-title">🟣 SOL/USDT</span>
+          <span id="badgeSOLUSDT" style="font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.06); font-family: var(--font-mono);">SCANNING</span>
+        </div>
+        <div id="priceSOLUSDT" class="pair-price">$0.00</div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.72rem;">
+          <span style="color: var(--text-muted);">SMA 30: <strong id="smaSOLUSDT" style="color: #fff;">$0.00</strong></span>
+          <span id="slopeSOLUSDT" class="pair-slope">Slope: SCANNING</span>
+        </div>
+      </div>
+
+      <!-- GOLD (PAXG) CARD -->
+      <div id="cardPAXGUSDT" class="pair-card" style="border-color: rgba(255, 215, 0, 0.2);">
+        <div class="pair-header">
+          <span class="pair-title" style="color: var(--gold);">🥇 GOLD (PAXG)</span>
+          <span id="badgePAXGUSDT" style="font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; background: rgba(255,215,0,0.1); color: var(--gold); font-family: var(--font-mono);">SCANNING</span>
+        </div>
+        <div id="pricePAXGUSDT" class="pair-price" style="color: var(--gold);">$0.00</div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.72rem;">
+          <span style="color: var(--text-muted);">SMA 30: <strong id="smaPAXGUSDT" style="color: #fff;">$0.00</strong></span>
+          <span id="slopePAXGUSDT" class="pair-slope">Slope: SCANNING</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPITAL & OVERALL PERFORMANCE METRICS -->
+    <div class="grid-metrics">
       <div class="card">
-        <div class="card-title">Virtual Balance</div>
+        <div class="card-title">Virtual Account Balance</div>
         <div id="valBalance" class="card-value">$25,000.00</div>
         <div id="valNetPnl" class="card-sub" style="color: var(--green); font-weight: 700;">+$0.00 (+0.00%)</div>
       </div>
 
       <div class="card">
-        <div class="card-title">SMA 30 Trend Filter</div>
-        <div id="valSma30" class="card-value" style="font-size: 1.25rem;">$0.00</div>
-        <div id="valSmaSlope" class="card-sub" style="font-weight: 700;">Slope: SCANNING</div>
+        <div class="card-title">Win Rate (1:2 RR Target)</div>
+        <div id="valWinRate" class="card-value" style="color: var(--cyan);">0.0%</div>
+        <div id="valTradesCount" class="card-sub">0 Closed Trades</div>
       </div>
 
       <div class="card">
-        <div class="card-title">Performance (1:2 RR)</div>
-        <div id="valWinRate" class="card-value" style="color: var(--cyan);">0.0%</div>
-        <div id="valTradesCount" class="card-sub">0 Closed Trades</div>
+        <div class="card-title">Active Concurrent Trades</div>
+        <div id="valActiveCount" class="card-value" style="color: var(--accent);">0 / 4</div>
+        <div class="card-sub">$5,000 Allocation per trade</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Timeframe & Engine</div>
+        <div class="card-value" style="font-size: 1.15rem; color: var(--purple);">15M + SMA 30</div>
+        <div class="card-sub">BTC + ETH + SOL + GOLD (PAXG)</div>
       </div>
     </div>
 
     <!-- MAIN TWO-COLUMN SECTION -->
     <div class="main-grid">
-      <!-- LEFT: ACTIVE POSITION & SNIPER DETAILS -->
+      <!-- LEFT: ACTIVE POSITIONS MONITOR -->
       <div class="pos-card">
-        <div class="pos-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <h2 style="font-size: 1.1rem; font-weight: 800;">🎯 Active Sniper Position</h2>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">1.7 ATR Stop Loss | 1:2 Take Profit Fixed</div>
+            <h2 style="font-size: 1.1rem; font-weight: 800;">🎯 Active Live Positions</h2>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Real-time monitoring across BTC, ETH, SOL, and Gold</div>
           </div>
-          <div id="posTypeBadge" class="pos-type-badge FLAT">FLAT (SCANNING)</div>
+          <div id="activePosSummary" style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">0 Open Trades</div>
         </div>
 
-        <div id="posContent">
-          <div class="scanning-box">
-            <div class="radar-circle"></div>
-            <div>
-              <div style="font-weight: 700; color: #fff;">15M Candles Scanning in Progress...</div>
-              <div style="font-size: 0.75rem; margin-top: 4px;">Waiting for Moti Candle 7-bar rolloff exhaustion TP outside 1.2x ATR with matching SMA 30 Slope.</div>
-            </div>
+        <div id="activePositionsContainer" style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="text-align: center; padding: 36px 20px; color: var(--text-muted);">
+            <div style="font-weight: 700; color: #fff; margin-bottom: 6px;">Scanning BTC, ETH, SOL & GOLD Simultaneously...</div>
+            <div style="font-size: 0.75rem;">No active positions right now. Waiting for Moti exhaustion 7-bar rolloff TP outside 1.2x ATR with confirmed SMA 30 slope.</div>
           </div>
         </div>
 
         <!-- STRATEGY RULES BOX -->
         <div style="background: rgba(0,0,0,0.25); padding: 14px; border-radius: 10px; border: 1px solid var(--card-border); font-size: 0.75rem; line-height: 1.6;">
-          <div style="font-weight: 800; color: var(--accent); margin-bottom: 4px;">📋 13,000 Candles Tested Rules:</div>
-          <div>• <strong>Trigger:</strong> 7th Bar after Moti Candle + Price &gt; 1.2 ATR from SMA 30.</div>
-          <div>• <strong>Short:</strong> TP Above Candle + SMA 30 Sloping DOWN (Fades Bull Trap).</div>
-          <div>• <strong>Long:</strong> TP Below Candle + SMA 30 Sloping UP (Fades Bear Dump).</div>
-          <div>• <strong>Exit Rules:</strong> SL = 1.7 ATR beyond wick | TP = Fixed 1:2 Risk-Reward ratio.</div>
+          <div style="font-weight: 800; color: var(--accent); margin-bottom: 4px;">📋 Multi-Asset Execution Rules:</div>
+          <div>• <strong>Assets:</strong> BTC, ETH, SOL, and Gold (PAXG/USDT) 15M candles.</div>
+          <div>• <strong>Trigger:</strong> 7th Bar after Moti Candle + Price &gt; 1.2 ATR away from SMA 30.</div>
+          <div>• <strong>Filter:</strong> Short only when SMA 30 slopes DOWN; Long only when SMA 30 slopes UP.</div>
+          <div>• <strong>Exits:</strong> SL = 1.7 ATR | TP = Fixed 1:2 Risk:Reward ($5,000 size).</div>
         </div>
       </div>
 
       <!-- RIGHT: RECENT CLOSED TRADES -->
       <div class="pos-card">
-        <div class="pos-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
             <h2 style="font-size: 1.1rem; font-weight: 800;">📜 Trade History</h2>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">Realized PnL and Execution Log</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Combined Realized PnL Across All Assets</div>
           </div>
           <div id="historyCount" style="font-size: 0.75rem; font-family: var(--font-mono); color: var(--text-muted);">0 Trades</div>
         </div>
@@ -354,16 +331,17 @@
           <table>
             <thead>
               <tr>
+                <th>Asset</th>
                 <th>Type</th>
                 <th>Entry</th>
                 <th>Exit</th>
-                <th>Exit Reason</th>
+                <th>Reason</th>
                 <th>PnL ($)</th>
               </tr>
             </thead>
             <tbody id="tradeHistoryBody">
               <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No closed trades yet</td>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">No closed trades yet</td>
               </tr>
             </tbody>
           </table>
@@ -374,7 +352,6 @@
 
   <script>
     let isRunning = true;
-    let activeSymbol = 'BTCUSDT';
 
     async function fetchStatus() {
       try {
@@ -388,7 +365,6 @@
 
     function renderUI(data) {
       isRunning = Boolean(data.isRunning);
-      activeSymbol = data.symbol || 'BTCUSDT';
 
       // Controls & Badges
       document.getElementById('btnStart').disabled = isRunning;
@@ -404,15 +380,43 @@
         badgeText.textContent = 'PAUSED / STOPPED';
       }
 
-      ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].forEach(sym => {
-        const btn = document.getElementById('pair' + sym);
-        if (btn) btn.className = 'tf-btn' + (sym === activeSymbol ? ' active' : '');
+      // Update 4 Cards
+      const mData = data.marketData || {};
+      const posMap = data.positionsMap || {};
+
+      ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PAXGUSDT'].forEach(sym => {
+        const d = mData[sym] || {};
+        const pos = posMap[sym];
+
+        const priceEl = document.getElementById('price' + sym);
+        const smaEl = document.getElementById('sma' + sym);
+        const slopeEl = document.getElementById('slope' + sym);
+        const badgeEl = document.getElementById('badge' + sym);
+        const cardEl = document.getElementById('card' + sym);
+
+        if (priceEl) priceEl.textContent = '$' + (d.curPrice ? Number(d.curPrice).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00');
+        if (smaEl) smaEl.textContent = '$' + (d.sma30 ? Number(d.sma30).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00');
+        
+        const slope = d.sma30Slope || 'FLAT';
+        if (slopeEl) {
+          slopeEl.textContent = `Slope: ${slope} ${slope === 'DOWN' ? '🔻' : slope === 'UP' ? '🔺' : '➖'}`;
+          slopeEl.style.color = slope === 'DOWN' ? 'var(--red)' : slope === 'UP' ? 'var(--green)' : 'var(--yellow)';
+        }
+
+        if (pos) {
+          cardEl.className = 'pair-card active-trade';
+          badgeEl.textContent = `${pos.type} ACTIVE`;
+          badgeEl.style.background = pos.type === 'LONG' ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255, 23, 68, 0.2)';
+          badgeEl.style.color = pos.type === 'LONG' ? 'var(--green)' : 'var(--red)';
+        } else {
+          cardEl.className = 'pair-card';
+          badgeEl.textContent = 'SCANNING';
+          badgeEl.style.background = 'rgba(255,255,255,0.06)';
+          badgeEl.style.color = 'var(--text-muted)';
+        }
       });
 
-      // Metric Cards
-      document.getElementById('valPrice').textContent = '$' + (data.curPrice ? Number(data.curPrice).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00');
-      document.getElementById('valPair').textContent = `${activeSymbol} (15M Binance Feed)`;
-
+      // Overall Balance & Metrics
       document.getElementById('valBalance').textContent = '$' + Number(data.balance || 25000).toLocaleString(undefined, { minimumFractionDigits: 2 });
       const netPnl = Number(data.netPnlUsd || 0);
       const netPct = Number(data.netPnlPct || 0);
@@ -420,68 +424,60 @@
       netEl.textContent = `${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} (${netPct.toFixed(2)}%)`;
       netEl.style.color = netPnl >= 0 ? 'var(--green)' : 'var(--red)';
 
-      document.getElementById('valSma30').textContent = '$' + Number(data.sma30 || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-      const slopeEl = document.getElementById('valSmaSlope');
-      const slope = data.sma30Slope || 'FLAT';
-      slopeEl.textContent = `Slope: ${slope} ${slope === 'DOWN' ? '🔻' : slope === 'UP' ? '🔺' : '➖'}`;
-      slopeEl.style.color = slope === 'DOWN' ? 'var(--red)' : slope === 'UP' ? 'var(--green)' : 'var(--yellow)';
-
       document.getElementById('valWinRate').textContent = `${data.winRate || '0.0'}%`;
       document.getElementById('valTradesCount').textContent = `${data.totalTrades || 0} Closed Trades`;
 
-      // Active Position Card
-      const posBadge = document.getElementById('posTypeBadge');
-      const posContent = document.getElementById('posContent');
+      const activePositions = data.activePositions || [];
+      document.getElementById('valActiveCount').textContent = `${activePositions.length} / 4`;
+      document.getElementById('activePosSummary').textContent = `${activePositions.length} Open Trade${activePositions.length === 1 ? '' : 's'}`;
 
-      if (data.activePosition) {
-        const p = data.activePosition;
-        posBadge.className = `pos-type-badge ${p.type}`;
-        posBadge.textContent = `${p.type} ACTIVE`;
-
-        const uPnl = Number(p.unrealizedPnlUsd || 0);
-        const uPct = Number(p.unrealizedPnlPct || 0);
-        const isProfit = uPnl >= 0;
-
-        posContent.innerHTML = `
-          <div class="pos-levels">
-            <div class="level-box">
-              <span class="level-label">ENTRY PRICE</span>
-              <span class="level-val">$${Number(p.entryPrice).toFixed(2)}</span>
-            </div>
-            <div class="level-box">
-              <span class="level-label" style="color: var(--red);">STOP LOSS (1.7 ATR)</span>
-              <span class="level-val" style="color: var(--red);">$${Number(p.stopLoss).toFixed(2)}</span>
-            </div>
-            <div class="level-box">
-              <span class="level-label" style="color: var(--green);">TAKE PROFIT (1:2 RR)</span>
-              <span class="level-val" style="color: var(--green);">$${Number(p.takeProfit).toFixed(2)}</span>
-            </div>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 8px;">
-            <div>
-              <div style="font-size: 0.7rem; color: var(--text-muted);">POSITION SIZE</div>
-              <div style="font-weight: 800; font-family: var(--font-mono);">$${Number(p.sizeUsd || 5000).toLocaleString()}</div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.7rem; color: var(--text-muted);">UNREALIZED PnL</div>
-              <div style="font-weight: 800; font-family: var(--font-mono); color: ${isProfit ? 'var(--green)' : 'var(--red)'};">
-                ${isProfit ? '+' : ''}$${uPnl.toFixed(2)} (${uPct.toFixed(2)}%)
-              </div>
-            </div>
+      // Render Active Positions Cards
+      const posContainer = document.getElementById('activePositionsContainer');
+      if (activePositions.length === 0) {
+        posContainer.innerHTML = `
+          <div style="text-align: center; padding: 36px 20px; color: var(--text-muted);">
+            <div style="font-weight: 700; color: #fff; margin-bottom: 6px;">Scanning BTC, ETH, SOL & GOLD Simultaneously...</div>
+            <div style="font-size: 0.75rem;">No active positions right now. Waiting for Moti exhaustion 7-bar rolloff TP outside 1.2x ATR with confirmed SMA 30 slope.</div>
           </div>
         `;
       } else {
-        posBadge.className = 'pos-type-badge FLAT';
-        posBadge.textContent = 'FLAT (SCANNING)';
-        posContent.innerHTML = `
-          <div class="scanning-box">
-            <div class="radar-circle"></div>
-            <div>
-              <div style="font-weight: 700; color: #fff;">15M Candles Scanning in Progress...</div>
-              <div style="font-size: 0.75rem; margin-top: 4px;">Waiting for Moti Candle 7-bar rolloff exhaustion TP outside 1.2x ATR with matching SMA 30 Slope.</div>
+        posContainer.innerHTML = activePositions.map(p => {
+          const uPnl = Number(p.unrealizedPnlUsd || 0);
+          const uPct = Number(p.unrealizedPnlPct || 0);
+          const isProfit = uPnl >= 0;
+          const isLong = p.type === 'LONG';
+          const label = p.symbol === 'PAXGUSDT' ? '🥇 PAXG (Gold)' : p.symbol;
+
+          return `
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <strong style="font-family: var(--font-mono); font-size: 1rem;">${label}</strong>
+                  <span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; font-weight: 800; font-family: var(--font-mono); background: ${isLong ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 23, 68, 0.15)'}; color: ${isLong ? 'var(--green)' : 'var(--red)'};">
+                    ${p.type}
+                  </span>
+                </div>
+                <div style="font-family: var(--font-mono); font-weight: 800; color: ${isProfit ? 'var(--green)' : 'var(--red)'};">
+                  ${isProfit ? '+' : ''}$${uPnl.toFixed(2)} (${uPct.toFixed(2)}%)
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 0.75rem; font-family: var(--font-mono);">
+                <div>
+                  <div style="color: var(--text-muted); font-size: 0.68rem;">ENTRY</div>
+                  <div style="font-weight: 700;">$${Number(p.entryPrice).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div style="color: var(--red); font-size: 0.68rem;">STOP LOSS (1.7 ATR)</div>
+                  <div style="color: var(--red); font-weight: 700;">$${Number(p.stopLoss).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div style="color: var(--green); font-size: 0.68rem;">TAKE PROFIT (1:2)</div>
+                  <div style="color: var(--green); font-weight: 700;">$${Number(p.takeProfit).toFixed(2)}</div>
+                </div>
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        }).join('');
       }
 
       // History Table
@@ -490,12 +486,14 @@
       document.getElementById('historyCount').textContent = `${trades.length} Trades`;
 
       if (trades.length === 0) {
-        historyBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No closed trades yet</td></tr>`;
+        historyBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">No closed trades yet</td></tr>`;
       } else {
         historyBody.innerHTML = trades.map(t => {
           const isWin = t.pnlUsd > 0;
+          const label = t.symbol === 'PAXGUSDT' ? '🥇 Gold' : t.symbol;
           return `
             <tr>
+              <td><strong>${label}</strong></td>
               <td style="color: ${t.type === 'LONG' ? 'var(--green)' : 'var(--red)'}; font-weight: 700;">${t.type}</td>
               <td>$${Number(t.entryPrice).toFixed(2)}</td>
               <td>$${Number(t.exitPrice).toFixed(2)}</td>
@@ -505,15 +503,6 @@
           `;
         }).join('');
       }
-    }
-
-    async function switchPair(symbol) {
-      await fetch('/api/set-symbol', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol })
-      });
-      fetchStatus();
     }
 
     async function startBot() {
@@ -527,13 +516,13 @@
     }
 
     async function resetBot() {
-      if (confirm('Reset paper balance to $25,000 and clear history?')) {
+      if (confirm('Reset paper balance to $25,000 and clear history across all assets?')) {
         await fetch('/api/reset', { method: 'POST' });
         fetchStatus();
       }
     }
 
-    // Connect WebSocket for real-time pushed updates
+    // Connect WebSocket
     const ws = new WebSocket(`ws://${location.host}`);
     ws.onmessage = (event) => {
       try {
